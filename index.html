@@ -6,19 +6,24 @@
   <title>상담기록 생성기 v2 - Firebase</title>
   <style>
     :root {
-      --bg: #f6f7fb;
+      --bg: #f4f6fb;
       --panel: #ffffff;
       --panel-soft: #f9fafc;
       --text: #1f2937;
       --muted: #6b7280;
       --line: #e5e7eb;
+      --line-strong: #d1d5db;
       --brand: #2563eb;
       --brand-dark: #1d4ed8;
+      --brand-soft: #eff6ff;
       --danger: #dc2626;
       --warning: #d97706;
       --ok: #059669;
-      --shadow: 0 8px 30px rgba(15, 23, 42, 0.07);
-      --radius: 18px;
+      --shadow-sm: 0 1px 3px rgba(15, 23, 42, 0.06);
+      --shadow: 0 4px 20px rgba(15, 23, 42, 0.06);
+      --shadow-lg: 0 12px 36px rgba(15, 23, 42, 0.10);
+      --radius: 14px;
+      --radius-sm: 10px;
     }
 
     * { box-sizing: border-box; }
@@ -29,17 +34,12 @@
       font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
       line-height: 1.5;
     }
-    button, input, select, textarea {
-      font: inherit;
-    }
-    textarea {
-      resize: vertical;
-      min-height: 70px;
-    }
+    button, input, select, textarea { font: inherit; }
+    textarea { resize: vertical; min-height: 80px; }
     button {
       border: 0;
-      border-radius: 12px;
-      padding: 10px 14px;
+      border-radius: var(--radius-sm);
+      padding: 9px 14px;
       background: #eef2ff;
       color: #1e3a8a;
       cursor: pointer;
@@ -47,292 +47,452 @@
       transition: 0.15s ease;
       white-space: nowrap;
     }
-    button:hover { transform: translateY(-1px); background: #dbeafe; }
+    button:hover { background: #dbeafe; }
     button.primary { background: var(--brand); color: #fff; }
     button.primary:hover { background: var(--brand-dark); }
     button.danger { background: #fee2e2; color: #991b1b; }
-    button.ghost { background: transparent; color: var(--muted); border: 1px solid var(--line); }
-    button.small { padding: 7px 10px; border-radius: 10px; font-size: 13px; }
-    button:disabled { opacity: 0.5; cursor: not-allowed; transform: none; }
+    button.danger:hover { background: #fecaca; }
+    button.ghost { background: transparent; color: #374151; border: 1px solid var(--line); }
+    button.ghost:hover { background: #f3f4f6; }
+    button.small { padding: 6px 10px; border-radius: 8px; font-size: 13px; }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
 
     input, select, textarea {
       width: 100%;
       border: 1px solid var(--line);
-      border-radius: 12px;
-      padding: 10px 12px;
+      border-radius: var(--radius-sm);
+      padding: 9px 11px;
       background: #fff;
       color: var(--text);
       outline: none;
+      transition: border-color 0.15s, box-shadow 0.15s;
     }
     input:focus, select:focus, textarea:focus {
-      border-color: #93c5fd;
-      box-shadow: 0 0 0 3px rgba(147, 197, 253, 0.25);
+      border-color: var(--brand);
+      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
     }
-    label { display: block; font-weight: 700; margin-bottom: 6px; color: #374151; }
+    label {
+      display: block;
+      font-weight: 600;
+      margin-bottom: 5px;
+      color: #374151;
+      font-size: 13px;
+    }
+
+    /* ====== APP SHELL ====== */
     .app {
-      max-width: 1500px;
+      max-width: 1520px;
       margin: 0 auto;
-      padding: 22px;
+      padding: 14px 18px 24px;
     }
-    .hero {
+
+    /* ====== TOP BAR (sticky) ====== */
+    .topbar {
       display: flex;
+      align-items: center;
       justify-content: space-between;
-      align-items: flex-start;
       gap: 16px;
-      margin-bottom: 18px;
+      padding: 12px 16px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow);
+      margin-bottom: 16px;
+      position: sticky;
+      top: 8px;
+      z-index: 20;
+      flex-wrap: wrap;
     }
-    .hero h1 { margin: 0; font-size: 28px; letter-spacing: -0.03em; }
-    .hero p { margin: 6px 0 0; color: var(--muted); }
-    .badge-row { display: flex; flex-wrap: wrap; gap: 8px; justify-content: flex-end; }
+    .topbar-brand {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      flex-wrap: wrap;
+    }
+    .topbar-brand h1 {
+      margin: 0;
+      font-size: 19px;
+      letter-spacing: -0.02em;
+      color: #111827;
+    }
+    .topbar-badges { display: flex; gap: 6px; flex-wrap: wrap; }
     .badge {
       display: inline-flex;
       align-items: center;
-      gap: 6px;
-      padding: 8px 11px;
-      background: #fff;
+      gap: 5px;
+      padding: 5px 10px;
+      background: #f3f4f6;
       border: 1px solid var(--line);
       border-radius: 999px;
       color: #374151;
-      font-size: 13px;
-      box-shadow: 0 2px 10px rgba(15, 23, 42, 0.04);
+      font-size: 12px;
+      font-weight: 600;
     }
     .badge.warn { color: #92400e; background: #fffbeb; border-color: #fde68a; }
     .badge.ok { color: #065f46; background: #ecfdf5; border-color: #a7f3d0; }
     .badge.danger { color: #991b1b; background: #fef2f2; border-color: #fecaca; }
 
+    .topbar-tools {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+    .auth-bar {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 5px 8px 5px 10px;
+      background: #f9fafb;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      flex-wrap: wrap;
+    }
+    .auth-bar input {
+      width: 150px;
+      padding: 6px 9px;
+      font-size: 13px;
+      border-radius: 7px;
+      background: #fff;
+    }
+    .auth-bar .auth-info {
+      font-size: 13px;
+      color: #374151;
+      font-weight: 600;
+      padding: 0 6px;
+    }
+    .auth-bar .auth-info.ok { color: var(--ok); }
+    .auth-bar .auth-info.warn { color: var(--warning); }
+    .auth-bar button { padding: 6px 11px; font-size: 13px; border-radius: 7px; }
+
+    .topbar-divider {
+      width: 1px;
+      height: 28px;
+      background: var(--line);
+    }
+    .topbar-actions {
+      display: flex;
+      gap: 6px;
+      align-items: center;
+    }
+    .topbar-actions button {
+      padding: 8px 12px;
+      font-size: 13px;
+    }
+
+    /* Dropdown menu */
+    .more-wrap { position: relative; }
+    .more-menu {
+      position: absolute;
+      right: 0;
+      top: calc(100% + 6px);
+      min-width: 200px;
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      box-shadow: var(--shadow-lg);
+      padding: 6px;
+      display: none;
+      z-index: 30;
+    }
+    .more-menu.show { display: block; }
+    .more-menu button {
+      display: block;
+      width: 100%;
+      text-align: left;
+      background: transparent;
+      color: #1f2937;
+      padding: 9px 11px;
+      font-size: 13px;
+      font-weight: 600;
+      border-radius: 7px;
+    }
+    .more-menu button:hover { background: var(--brand-soft); color: var(--brand-dark); }
+    .more-menu .menu-divider { height: 1px; background: var(--line); margin: 4px 2px; }
+
+    /* ====== MAIN GRID ====== */
     .grid {
       display: grid;
-      grid-template-columns: 360px 1fr;
-      gap: 18px;
+      grid-template-columns: 300px 1fr;
+      gap: 14px;
       align-items: start;
     }
-    .panel {
-      background: var(--panel);
+
+    /* ====== SIDEBAR ====== */
+    .sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: sticky;
+      top: 76px;
+      max-height: calc(100vh - 90px);
+      overflow-y: auto;
+      padding-right: 2px;
+    }
+    .sidebar::-webkit-scrollbar { width: 6px; }
+    .sidebar::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 99px; }
+
+    .status-mini {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      padding: 10px 12px;
+      box-shadow: var(--shadow-sm);
+      font-size: 12.5px;
+      display: grid;
+      gap: 4px;
+    }
+    .status-mini .status-row {
+      display: flex;
+      justify-content: space-between;
+      gap: 8px;
+    }
+    .status-mini .status-row strong { color: #111827; font-weight: 700; }
+    .status-mini .status-meta { color: var(--muted); font-size: 11.5px; margin-top: 2px; }
+
+    .side-section {
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      box-shadow: var(--shadow-sm);
+      overflow: hidden;
+    }
+    .side-section > summary {
+      list-style: none;
+      cursor: pointer;
+      padding: 12px 14px;
+      font-weight: 700;
+      font-size: 14px;
+      color: #111827;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      user-select: none;
+    }
+    .side-section > summary::-webkit-details-marker { display: none; }
+    .side-section > summary::after {
+      content: "▾";
+      color: var(--muted);
+      transition: transform 0.2s;
+      font-size: 12px;
+    }
+    .side-section[open] > summary::after { transform: rotate(180deg); }
+    .side-section > summary:hover { background: #f9fafb; }
+    .side-section[open] > summary { border-bottom: 1px solid var(--line); }
+    .side-body { padding: 12px 14px 14px; }
+
+    /* ====== FORMS ====== */
+    .form-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 10px;
+    }
+    .form-grid.one { grid-template-columns: 1fr; }
+    .full { grid-column: 1 / -1; }
+    .help { font-size: 12px; color: var(--muted); margin-top: 5px; }
+    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .project-id {
+      background: #f3f4f6;
+      color: #374151;
+      border-radius: 8px;
+      padding: 7px 9px;
+      word-break: break-all;
+      font-size: 11.5px;
+      border: 1px solid #e5e7eb;
+    }
+    .actions { display: flex; flex-wrap: wrap; gap: 7px; }
+
+    .checkbox-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 6px;
+    }
+    .check-item {
+      display: flex;
+      align-items: center;
+      gap: 7px;
+      padding: 8px 9px;
+      border: 1px solid var(--line);
+      border-radius: 9px;
+      background: #fff;
+      font-size: 12.5px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+    .check-item:hover { background: #f9fafb; }
+    .check-item input { width: auto; margin: 0; }
+
+    .sub-head {
+      font-size: 12px;
+      color: var(--brand);
+      font-weight: 700;
+      margin: 10px 0 4px;
+      letter-spacing: 0.03em;
+    }
+    .sub-head:first-child { margin-top: 0; }
+
+    /* ====== MAIN PANEL ====== */
+    .main-panel {
+      background: #fff;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       overflow: hidden;
     }
-    .panel-header {
-      padding: 16px 18px;
-      border-bottom: 1px solid var(--line);
-      background: linear-gradient(180deg, #fff, #fbfcff);
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      gap: 12px;
-    }
-    .panel-header h2 {
-      margin: 0;
-      font-size: 18px;
-      letter-spacing: -0.02em;
-    }
-    .panel-body { padding: 18px; }
-    .section-title {
-      font-size: 14px;
-      color: #111827;
-      margin: 20px 0 10px;
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-    .section-title:first-child { margin-top: 0; }
-    .section-title::before {
-      content: "";
-      width: 7px;
-      height: 7px;
-      border-radius: 99px;
-      background: var(--brand);
-      display: inline-block;
-    }
-    .form-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 12px;
-    }
-    .form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
-    .form-grid.one { grid-template-columns: 1fr; }
-    .full { grid-column: 1 / -1; }
-    .help { font-size: 12.5px; color: var(--muted); margin-top: 6px; }
-    .mono {
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", monospace;
-    }
-    .project-id {
-      background: #f3f4f6;
-      color: #374151;
-      border-radius: 12px;
-      padding: 9px 10px;
-      word-break: break-all;
-      font-size: 12px;
-      border: 1px solid #e5e7eb;
-    }
-    .actions { display: flex; flex-wrap: wrap; gap: 8px; }
-    .status-box {
-      display: grid;
-      gap: 8px;
-      padding: 12px;
-      background: #f8fafc;
-      border: 1px solid var(--line);
-      border-radius: 14px;
-      font-size: 13px;
-    }
-    .status-line {
-      display: flex;
-      justify-content: space-between;
-      gap: 10px;
-    }
-    .status-line strong { color: #111827; }
-    .checkbox-grid {
-      display: grid;
-      grid-template-columns: repeat(2, minmax(0, 1fr));
-      gap: 8px;
-    }
-    .check-item {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 9px;
-      border: 1px solid var(--line);
-      border-radius: 12px;
-      background: #fff;
-      font-size: 13px;
-      font-weight: 600;
-      cursor: pointer;
-    }
-    .check-item input { width: auto; }
     .tabs {
       display: flex;
       flex-wrap: wrap;
-      gap: 8px;
-      padding: 12px;
+      gap: 6px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--line);
       background: var(--panel-soft);
       position: sticky;
-      top: 0;
-      z-index: 3;
+      top: 74px;
+      z-index: 5;
     }
     .tab {
-      padding: 8px 12px;
+      padding: 7px 12px;
       border-radius: 999px;
       border: 1px solid var(--line);
       background: #fff;
-      color: #374151;
+      color: #4b5563;
       cursor: pointer;
       font-size: 13px;
-      font-weight: 800;
+      font-weight: 700;
+      transition: 0.15s ease;
     }
+    .tab:hover { border-color: var(--brand); color: var(--brand); }
     .tab.active {
-      background: #dbeafe;
-      border-color: #93c5fd;
-      color: #1d4ed8;
+      background: var(--brand);
+      border-color: var(--brand);
+      color: #fff;
     }
+    .panel-body { padding: 16px; }
+
     .toolbar {
       display: grid;
-      grid-template-columns: 1fr auto auto auto;
+      grid-template-columns: 1.4fr 1fr 1fr auto;
       gap: 10px;
       align-items: end;
-      margin-bottom: 14px;
+      margin-bottom: 12px;
     }
+
     .student-card {
       border: 1px solid var(--line);
-      border-radius: 16px;
-      padding: 14px;
+      border-radius: var(--radius);
+      padding: 13px 14px;
       background: #fff;
-      margin-bottom: 12px;
+      margin-bottom: 10px;
+      box-shadow: var(--shadow-sm);
     }
     .student-head {
       display: flex;
       justify-content: space-between;
       gap: 12px;
       align-items: center;
-      margin-bottom: 12px;
+      margin-bottom: 11px;
     }
-    .student-name {
-      font-size: 17px;
-      font-weight: 900;
-      letter-spacing: -0.02em;
-    }
-    .student-meta {
-      color: var(--muted);
-      font-size: 12.5px;
-      margin-top: 2px;
-    }
+    .student-name { font-size: 16px; font-weight: 800; letter-spacing: -0.01em; }
+    .student-meta { color: var(--muted); font-size: 12px; margin-top: 2px; }
     .dirty-dot {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       color: #92400e;
       background: #fffbeb;
       border: 1px solid #fde68a;
       border-radius: 999px;
-      padding: 5px 8px;
-      font-size: 12px;
-      font-weight: 800;
+      padding: 3px 8px;
+      font-size: 11.5px;
+      font-weight: 700;
     }
     .saved-dot {
       display: inline-flex;
       align-items: center;
-      gap: 5px;
+      gap: 4px;
       color: #065f46;
       background: #ecfdf5;
       border: 1px solid #a7f3d0;
       border-radius: 999px;
-      padding: 5px 8px;
-      font-size: 12px;
-      font-weight: 800;
+      padding: 3px 8px;
+      font-size: 11.5px;
+      font-weight: 700;
     }
     .input-row {
       display: grid;
-      grid-template-columns: 160px 1fr;
+      grid-template-columns: 130px 1fr;
       gap: 10px;
       align-items: start;
-      margin-bottom: 10px;
+      margin-bottom: 9px;
     }
-    .input-row label { margin: 10px 0 0; font-size: 13px; }
+    .input-row label { margin: 9px 0 0; font-size: 13px; }
     .score-grid {
       display: grid;
       grid-template-columns: repeat(5, minmax(0, 1fr));
-      gap: 10px;
+      gap: 8px;
       margin-bottom: 10px;
     }
     .score-grid label { font-size: 12px; margin-bottom: 4px; }
+
+    /* ====== SPLIT (students / preview) ====== */
     .split {
       display: grid;
-      grid-template-columns: 1fr 420px;
-      gap: 18px;
+      grid-template-columns: 1fr 400px;
+      gap: 16px;
+    }
+    .preview-wrap {
+      position: sticky;
+      top: 130px;
+      max-height: calc(100vh - 150px);
+      display: flex;
+      flex-direction: column;
+    }
+    .preview-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 8px;
+      padding: 0 0 10px;
+    }
+    .preview-header h2 {
+      margin: 0;
+      font-size: 15px;
+      color: #111827;
+      letter-spacing: -0.01em;
     }
     .preview-box {
       white-space: pre-wrap;
-      min-height: 260px;
+      min-height: 300px;
       border: 1px solid var(--line);
       background: #fbfdff;
-      border-radius: 16px;
-      padding: 14px;
-      font-size: 14px;
+      border-radius: var(--radius);
+      padding: 14px 16px;
+      font-size: 13.5px;
+      line-height: 1.65;
       overflow: auto;
-      max-height: 560px;
+      flex: 1;
+      color: #1f2937;
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Noto Sans KR", sans-serif;
     }
-    .mini-table {
-      width: 100%;
-      border-collapse: collapse;
-      font-size: 13px;
-    }
+
+    .mini-table { width: 100%; border-collapse: collapse; font-size: 13px; }
     .mini-table th, .mini-table td {
       border-bottom: 1px solid var(--line);
-      padding: 8px;
+      padding: 7px 8px;
       text-align: left;
       vertical-align: top;
     }
-    .mini-table th { background: #f8fafc; color: #374151; }
+    .mini-table th { background: #f8fafc; color: #374151; font-weight: 700; }
+
     .local-list {
-      max-height: 240px;
+      max-height: 360px;
       overflow: auto;
       border: 1px solid var(--line);
-      border-radius: 12px;
+      border-radius: var(--radius-sm);
       background: #fff;
     }
     .local-item {
-      padding: 10px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--line);
       display: flex;
       justify-content: space-between;
@@ -343,23 +503,24 @@
     .empty-state {
       text-align: center;
       color: var(--muted);
-      padding: 42px 12px;
+      padding: 36px 12px;
       border: 1px dashed #cbd5e1;
-      border-radius: 16px;
+      border-radius: var(--radius);
       background: #f8fafc;
     }
     .notice {
       background: #fff7ed;
       color: #9a3412;
       border: 1px solid #fed7aa;
-      border-radius: 14px;
-      padding: 12px;
+      border-radius: var(--radius-sm);
+      padding: 10px 12px;
       font-size: 13px;
     }
+
     .modal-backdrop {
       position: fixed;
       inset: 0;
-      background: rgba(15, 23, 42, 0.42);
+      background: rgba(15, 23, 42, 0.45);
       display: none;
       align-items: center;
       justify-content: center;
@@ -368,30 +529,34 @@
     }
     .modal-backdrop.show { display: flex; }
     .modal {
-      width: min(900px, 100%);
+      width: min(880px, 100%);
       max-height: 88vh;
       overflow: auto;
       background: #fff;
-      border-radius: 22px;
-      box-shadow: 0 24px 80px rgba(0,0,0,0.22);
+      border-radius: 18px;
+      box-shadow: 0 24px 80px rgba(0,0,0,0.25);
       border: 1px solid var(--line);
     }
     .modal header {
-      padding: 18px;
+      padding: 16px 18px;
       border-bottom: 1px solid var(--line);
       display: flex;
       justify-content: space-between;
       align-items: center;
       gap: 12px;
+      position: sticky;
+      top: 0;
+      background: #fff;
     }
-    .modal header h3 { margin: 0; font-size: 18px; }
+    .modal header h3 { margin: 0; font-size: 17px; }
     .modal main { padding: 18px; }
+
     .toast {
       position: fixed;
       right: 20px;
       bottom: 20px;
-      padding: 12px 14px;
-      border-radius: 14px;
+      padding: 12px 16px;
+      border-radius: var(--radius-sm);
       background: #111827;
       color: #fff;
       box-shadow: 0 16px 40px rgba(0,0,0,0.22);
@@ -405,168 +570,197 @@
     }
     .toast.show { transform: translateY(0); opacity: 1; }
 
-    @media (max-width: 1180px) {
-      .grid, .split { grid-template-columns: 1fr; }
-      .toolbar { grid-template-columns: 1fr 1fr; }
+    /* ====== RESPONSIVE ====== */
+    @media (max-width: 1200px) {
+      .grid { grid-template-columns: 1fr; }
+      .sidebar { position: static; max-height: none; }
+      .split { grid-template-columns: 1fr; }
+      .preview-wrap { position: static; max-height: none; }
+      .tabs { top: 0; }
     }
-    @media (max-width: 760px) {
-      .app { padding: 12px; }
-      .hero { flex-direction: column; }
-      .form-grid, .form-grid.three, .toolbar, .score-grid, .input-row { grid-template-columns: 1fr; }
+    @media (max-width: 800px) {
+      .app { padding: 8px 10px 18px; }
+      .topbar { position: static; padding: 10px; }
+      .topbar-tools { width: 100%; }
+      .auth-bar { width: 100%; }
+      .auth-bar input { flex: 1; min-width: 110px; width: auto; }
+      .toolbar { grid-template-columns: 1fr 1fr; }
+      .form-grid { grid-template-columns: 1fr; }
       .checkbox-grid { grid-template-columns: 1fr; }
+      .score-grid { grid-template-columns: repeat(2, 1fr); }
+      .input-row { grid-template-columns: 1fr; }
       .student-head { align-items: flex-start; flex-direction: column; }
     }
 
     @media print {
       body { background: #fff; }
-      .no-print, .grid > aside, .tabs, .toolbar, .student-card, .hero { display: none !important; }
+      .no-print, .sidebar, .tabs, .toolbar, .student-card, .topbar { display: none !important; }
       .grid, .split { display: block; }
-      .panel { box-shadow: none; border: 0; }
+      .main-panel { box-shadow: none; border: 0; }
       .preview-box { max-height: none; border: 0; }
     }
   </style>
-<script type="text/javascript" nonce="e1ca18035d8f4a1795b1f961d7a" src="//local.adguard.org?ts=1777019152278&amp;type=content-script&amp;dmn=chatgpt.com&amp;url=https%3A%2F%2Fchatgpt.com%2Fbackend-api%2Festuary%2Fcontent%3Fid%3Dfile_00000000ba707209a65614740c529891%26ts%3D493617%26p%3Dfs%26cid%3D1%26sig%3Dd9d677a4a43ac734e99565dd1b5a8105b9f9641f202ce75fa8afcb630e6d3056%26v%3D0&amp;app=com.google.Chrome&amp;css=2&amp;js=1&amp;rel=1&amp;rji=1&amp;sbe=1&amp;stealth=1&amp;st-push&amp;st-loc&amp;st-java&amp;st-dnt&amp;st-1pcttl=4320"></script><script type="text/javascript" nonce="e1ca18035d8f4a1795b1f961d7a" src="//local.adguard.org?ts=1777019152278&amp;name=AdGuard%20Extra&amp;type=user-script"></script></head>
+</head>
 <body>
   <div class="app">
-    <div class="hero no-print">
-      <div>
-        <h1>상담기록 생성기 v2</h1>
-        <p>localStorage 자동 임시 저장 + Ctrl+S Firebase 서버 저장 + 학생별 dirty 저장 구조</p>
+    <!-- ============================= TOP BAR ============================= -->
+    <header class="topbar no-print">
+      <div class="topbar-brand">
+        <h1>📋 상담기록 생성기</h1>
+        <div class="topbar-badges">
+          <span class="badge" id="studentCountBadge">학생 0명</span>
+          <span class="badge warn" id="unsavedBadge">서버 미저장</span>
+          <span class="badge" id="firebaseBadge">Firebase 확인 중</span>
+        </div>
       </div>
-      <div class="badge-row">
-        <span class="badge" id="studentCountBadge">학생 0명</span>
-        <span class="badge warn" id="unsavedBadge">서버 미저장</span>
-        <span class="badge" id="firebaseBadge">Firebase 확인 중</span>
+      <div class="topbar-tools">
+        <div class="auth-bar">
+          <input id="authEmail" type="email" placeholder="이메일" autocomplete="username" />
+          <input id="authPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
+          <button id="loginBtn" type="button" class="primary">로그인</button>
+          <span id="authInfoTop" class="auth-info" hidden></span>
+          <button id="logoutBtn" class="ghost" type="button" hidden>로그아웃</button>
+        </div>
+        <div class="topbar-divider"></div>
+        <div class="topbar-actions">
+          <button id="saveServerBtn" class="primary" type="button" title="Ctrl+S로 빠르게 저장">💾 서버 저장</button>
+          <button id="loadServerBtn" type="button">서버 불러오기</button>
+          <div class="more-wrap">
+            <button id="moreBtn" class="ghost" type="button" aria-haspopup="menu" aria-expanded="false">더보기 ▾</button>
+            <div id="moreMenu" class="more-menu" role="menu">
+              <button id="saveJsonBtn" type="button">📄 JSON 저장</button>
+              <button id="loadJsonBtn" type="button">📂 JSON 불러오기</button>
+              <button id="showLocalProjectsBtn" type="button">🗂 로컬 프로젝트 목록</button>
+              <div class="menu-divider"></div>
+              <button id="newProjectBtn" type="button">✨ 새 프로젝트</button>
+            </div>
+          </div>
+        </div>
       </div>
-    </div>
+    </header>
+    <input id="jsonFileInput" type="file" accept="application/json,.json" hidden />
 
+    <!-- ============================= MAIN GRID ============================= -->
     <div class="grid">
-      <aside class="panel no-print">
-        <div class="panel-header">
-          <h2>프로젝트 설정</h2>
-          <button class="small ghost" id="newProjectBtn" type="button">새 프로젝트</button>
-        </div>
-        <div class="panel-body">
-          <div class="section-title">기본 정보</div>
-          <div class="form-grid">
-            <div>
-              <label for="teacherName">상담자</label>
-              <input id="teacherName" list="teacherList" placeholder="예: 최영진" autocomplete="off" />
-              <datalist id="teacherList">
-                <option value="최영진"></option>
-                <option value="김선생님"></option>
-                <option value="이선생님"></option>
-              </datalist>
-            </div>
-            <div>
-              <label for="year">연도</label>
-              <input id="year" value="26" />
-            </div>
-            <div>
-              <label for="semester">학기</label>
-              <select id="semester">
-                <option value="SP">SP</option>
-                <option value="SU">SU</option>
-                <option value="FA">FA</option>
-                <option value="WI">WI</option>
-              </select>
-            </div>
-            <div>
-              <label for="testType">시험 종류</label>
-              <select id="testType">
-                <option value="MT1">MT1</option>
-                <option value="MT2" selected>MT2</option>
-                <option value="TT">TT</option>
-                <option value="Prelim">Prelim</option>
-                <option value="ETC">ETC</option>
-              </select>
-            </div>
-            <div class="full">
-              <label for="consultationType">상담 차수</label>
-              <select id="consultationType">
-                <option value="1차정기">1차 정기 상담</option>
-                <option value="2차정기">2차 정기 상담</option>
-                <option value="3차정기" selected>3차 정기 상담</option>
-                <option value="4차정기">4차 정기 상담</option>
-                <option value="특별상담">특별 상담</option>
-                <option value="보충상담">보충 상담</option>
-              </select>
-            </div>
-            <div class="full">
-              <label for="projectName">프로젝트명</label>
-              <input id="projectName" placeholder="자동 생성 또는 직접 입력" />
-            </div>
-            <div class="full">
-              <label>projectId</label>
-              <div id="projectIdView" class="project-id mono"></div>
-            </div>
-          </div>
-
-          <div class="section-title">저장 상태</div>
-          <div class="status-box">
-            <div class="status-line"><strong>로컬</strong><span id="localSaveStatus">로컬 저장 전</span></div>
-            <div class="status-line"><strong>서버</strong><span id="serverSaveStatus">Firebase 확인 중</span></div>
-            <div class="status-line"><strong>변경</strong><span id="dirtyCount">변경된 학생 0명</span></div>
-            <div class="status-line"><strong>마지막 저장</strong><span id="lastSavedAtView">-</span></div>
-          </div>
-
-          <div class="section-title">서버 / 파일</div>
-          <div class="actions">
-            <button id="saveServerBtn" class="primary" type="button">진행값 서버 저장 Ctrl+S</button>
-            <button id="loadServerBtn" type="button">서버에서 불러오기</button>
-            <button id="saveJsonBtn" type="button">JSON 저장</button>
-            <button id="loadJsonBtn" type="button">JSON 불러오기</button>
-            <button id="showLocalProjectsBtn" type="button">로컬 목록</button>
-            <input id="jsonFileInput" type="file" accept="application/json,.json" hidden />
-          </div>
-
-          <div class="section-title">Firebase 로그인</div>
-          <div class="form-grid one">
-            <div id="authInfo" class="notice">Firebase 설정값을 넣으면 이메일 로그인 후 저장할 수 있습니다.</div>
-            <div>
-              <label for="authEmail">이메일</label>
-              <input id="authEmail" type="email" placeholder="Firebase Auth 이메일" autocomplete="username" />
-            </div>
-            <div>
-              <label for="authPassword">비밀번호</label>
-              <input id="authPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
-            </div>
-            <div class="actions">
-              <button id="loginBtn" type="button">로그인</button>
-              <button id="logoutBtn" type="button">로그아웃</button>
-            </div>
-          </div>
-
-          <div class="section-title">포함 항목</div>
-          <div id="includeFields" class="checkbox-grid"></div>
-
-          <div class="section-title">일정</div>
-          <div class="form-grid">
-            <div class="full"><strong>3D 일정</strong></div>
-            <div><label for="schedule3DTermTest">Term Test</label><input id="schedule3DTermTest" /></div>
-            <div><label for="schedule3DEopAlexAward">EOP/ALEX Award</label><input id="schedule3DEopAlexAward" /></div>
-            <div><label for="schedule3DMarketDay">Market Day</label><input id="schedule3DMarketDay" /></div>
-            <div><label for="schedule3DSummerStart">Summer Start</label><input id="schedule3DSummerStart" /></div>
-            <div class="full"><strong>2D 일정</strong></div>
-            <div><label for="schedule2DTermTest">Term Test</label><input id="schedule2DTermTest" /></div>
-            <div><label for="schedule2DEopAlexAward">EOP/ALEX Award</label><input id="schedule2DEopAlexAward" /></div>
-            <div><label for="schedule2DMarketDay">Market Day</label><input id="schedule2DMarketDay" /></div>
-            <div><label for="schedule2DSummerStart">Summer Start</label><input id="schedule2DSummerStart" /></div>
-          </div>
-
-          <div class="section-title">자유 추가 항목</div>
-          <div class="form-grid one">
-            <div>
-              <label for="extraFieldName">항목명</label>
-              <input id="extraFieldName" placeholder="예: 진급 가능성" />
-            </div>
-            <button id="addExtraFieldBtn" type="button">추가 항목 만들기</button>
-            <div id="extraFieldsList"></div>
+      <!-- ====== SIDEBAR ====== -->
+      <aside class="sidebar no-print">
+        <!-- 항상 표시되는 미니 상태 카드 -->
+        <div class="status-mini">
+          <div class="status-row"><strong>로컬</strong><span id="localSaveStatus">-</span></div>
+          <div class="status-row"><strong>서버</strong><span id="serverSaveStatus">-</span></div>
+          <div class="status-meta">
+            <span id="dirtyCount">변경 0명</span> · 마지막: <span id="lastSavedAtView">-</span>
           </div>
         </div>
+
+        <!-- 기본 정보 (기본 펼침) -->
+        <details class="side-section" open>
+          <summary>⚙️ 기본 정보</summary>
+          <div class="side-body">
+            <div class="form-grid">
+              <div class="full">
+                <label for="teacherName">상담자</label>
+                <input id="teacherName" list="teacherList" placeholder="예: 최영진" autocomplete="off" />
+                <datalist id="teacherList">
+                  <option value="최영진"></option>
+                  <option value="김선생님"></option>
+                  <option value="이선생님"></option>
+                </datalist>
+              </div>
+              <div>
+                <label for="year">연도</label>
+                <input id="year" value="26" />
+              </div>
+              <div>
+                <label for="semester">학기</label>
+                <select id="semester">
+                  <option value="SP">SP</option>
+                  <option value="SU">SU</option>
+                  <option value="FA">FA</option>
+                  <option value="WI">WI</option>
+                </select>
+              </div>
+              <div>
+                <label for="testType">시험</label>
+                <select id="testType">
+                  <option value="MT1">MT1</option>
+                  <option value="MT2" selected>MT2</option>
+                  <option value="TT">TT</option>
+                  <option value="Prelim">Prelim</option>
+                  <option value="ETC">ETC</option>
+                </select>
+              </div>
+              <div>
+                <label for="consultationType">차수</label>
+                <select id="consultationType">
+                  <option value="1차정기">1차 정기</option>
+                  <option value="2차정기">2차 정기</option>
+                  <option value="3차정기" selected>3차 정기</option>
+                  <option value="4차정기">4차 정기</option>
+                  <option value="특별상담">특별 상담</option>
+                  <option value="보충상담">보충 상담</option>
+                </select>
+              </div>
+              <div class="full">
+                <label for="projectName">프로젝트명</label>
+                <input id="projectName" placeholder="자동 생성 또는 직접 입력" />
+              </div>
+              <div class="full">
+                <label>프로젝트 ID</label>
+                <div id="projectIdView" class="project-id mono"></div>
+              </div>
+            </div>
+            <div id="authInfo" class="notice" style="margin-top:10px; font-size:12px;">Firebase 확인 중...</div>
+          </div>
+        </details>
+
+        <!-- 포함 항목 -->
+        <details class="side-section">
+          <summary>✅ 포함 항목</summary>
+          <div class="side-body">
+            <div id="includeFields" class="checkbox-grid"></div>
+          </div>
+        </details>
+
+        <!-- 일정 -->
+        <details class="side-section">
+          <summary>📅 일정</summary>
+          <div class="side-body">
+            <div class="sub-head">3D 일정</div>
+            <div class="form-grid">
+              <div><label for="schedule3DTermTest">Term Test</label><input id="schedule3DTermTest" /></div>
+              <div><label for="schedule3DEopAlexAward">EOP/ALEX</label><input id="schedule3DEopAlexAward" /></div>
+              <div><label for="schedule3DMarketDay">Market Day</label><input id="schedule3DMarketDay" /></div>
+              <div><label for="schedule3DSummerStart">Summer</label><input id="schedule3DSummerStart" /></div>
+            </div>
+            <div class="sub-head">2D 일정</div>
+            <div class="form-grid">
+              <div><label for="schedule2DTermTest">Term Test</label><input id="schedule2DTermTest" /></div>
+              <div><label for="schedule2DEopAlexAward">EOP/ALEX</label><input id="schedule2DEopAlexAward" /></div>
+              <div><label for="schedule2DMarketDay">Market Day</label><input id="schedule2DMarketDay" /></div>
+              <div><label for="schedule2DSummerStart">Summer</label><input id="schedule2DSummerStart" /></div>
+            </div>
+          </div>
+        </details>
+
+        <!-- 자유 추가 항목 -->
+        <details class="side-section">
+          <summary>➕ 자유 추가 항목</summary>
+          <div class="side-body">
+            <div class="form-grid one">
+              <div>
+                <label for="extraFieldName">항목명</label>
+                <input id="extraFieldName" placeholder="예: 진급 가능성" />
+              </div>
+              <button id="addExtraFieldBtn" type="button">추가 항목 만들기</button>
+              <div id="extraFieldsList"></div>
+            </div>
+          </div>
+        </details>
       </aside>
 
-      <main class="panel">
+      <!-- ====== MAIN PANEL ====== -->
+      <main class="main-panel">
         <div class="tabs no-print" id="criterionTabs"></div>
         <div class="panel-body">
           <div class="split">
@@ -574,23 +768,23 @@
               <div class="toolbar no-print">
                 <div>
                   <label for="searchInput">학생 검색</label>
-                  <input id="searchInput" placeholder="이름 또는 반 검색" />
+                  <input id="searchInput" placeholder="이름 또는 반" />
                 </div>
                 <div>
-                  <label for="classFilter">반 필터</label>
-                  <select id="classFilter"><option value="">전체 반</option></select>
+                  <label for="classFilter">반</label>
+                  <select id="classFilter"><option value="">전체</option></select>
                 </div>
                 <div>
                   <label for="completionFilter">상태</label>
                   <select id="completionFilter">
                     <option value="all">전체</option>
-                    <option value="dirty">서버 저장 필요</option>
-                    <option value="incomplete">현재 항목 미입력</option>
-                    <option value="complete">현재 항목 입력완료</option>
+                    <option value="dirty">저장 필요</option>
+                    <option value="incomplete">미입력</option>
+                    <option value="complete">입력완료</option>
                   </select>
                 </div>
                 <div>
-                  <label for="pageSize">표시 인원</label>
+                  <label for="pageSize">표시</label>
                   <select id="pageSize">
                     <option value="10">10명</option>
                     <option value="20" selected>20명</option>
@@ -602,26 +796,22 @@
               <div id="bulkTools" class="no-print"></div>
               <div id="studentsContainer"></div>
               <div class="actions no-print" style="justify-content:center; margin-top:14px;">
-                <button id="prevPageBtn" type="button">이전</button>
+                <button id="prevPageBtn" type="button">← 이전</button>
                 <span class="badge" id="pageInfo">1 / 1</span>
-                <button id="nextPageBtn" type="button">다음</button>
+                <button id="nextPageBtn" type="button">다음 →</button>
               </div>
             </section>
 
-            <aside>
-              <div class="panel" style="box-shadow:none;">
-                <div class="panel-header">
-                  <h2>상담문 미리보기</h2>
-                  <div class="actions no-print">
-                    <button class="small" id="copyCurrentBtn" type="button">현재 학생 복사</button>
-                    <button class="small" id="copyAllBtn" type="button">전체 복사</button>
-                  </div>
-                </div>
-                <div class="panel-body">
-                  <select id="previewStudentSelect" class="no-print" style="margin-bottom:10px;"></select>
-                  <div id="previewBox" class="preview-box"></div>
+            <aside class="preview-wrap">
+              <div class="preview-header">
+                <h2>📝 상담문 미리보기</h2>
+                <div class="actions no-print">
+                  <button class="small primary" id="copyCurrentBtn" type="button">현재 복사</button>
+                  <button class="small" id="copyAllBtn" type="button">전체 복사</button>
                 </div>
               </div>
+              <select id="previewStudentSelect" class="no-print" style="margin-bottom:10px;"></select>
+              <div id="previewBox" class="preview-box"></div>
             </aside>
           </div>
         </div>
@@ -1074,6 +1264,45 @@
       });
       $("loginBtn").addEventListener("click", loginWithEmail);
       $("logoutBtn").addEventListener("click", logout);
+
+      // Enter 키로 로그인 제출 (이메일/비밀번호 어느 쪽에서든)
+      ["authEmail", "authPassword"].forEach(id => {
+        $(id).addEventListener("keydown", (e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            loginWithEmail();
+          }
+        });
+      });
+
+      // "더보기 ▾" 드롭다운 토글
+      const moreBtn = $("moreBtn");
+      const moreMenu = $("moreMenu");
+      moreBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const isOpen = moreMenu.classList.toggle("show");
+        moreBtn.setAttribute("aria-expanded", String(isOpen));
+      });
+      moreMenu.addEventListener("click", (e) => {
+        // 메뉴 안에서 버튼을 눌렀을 때 메뉴 닫기
+        if (e.target.closest("button")) {
+          moreMenu.classList.remove("show");
+          moreBtn.setAttribute("aria-expanded", "false");
+        }
+      });
+      document.addEventListener("click", (e) => {
+        if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
+          moreMenu.classList.remove("show");
+          moreBtn.setAttribute("aria-expanded", "false");
+        }
+      });
+      document.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") {
+          moreMenu.classList.remove("show");
+          moreBtn.setAttribute("aria-expanded", "false");
+          $("localProjectsModal").classList.remove("show");
+        }
+      });
 
       document.addEventListener("keydown", (event) => {
         if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
@@ -1668,49 +1897,54 @@
     }
 
     function buildConsultationText(student) {
-      const lines = [];
+      // 들여쓰기: 서식이 안 먹는 입력란용 — 공백 3칸 사용
+      const INDENT = "   ";
       const title = project.projectName || makeAutoProjectName();
       const score = getScore(student);
-      lines.push(`[${title}]`);
-      lines.push(`${student.name} (${student.className}) 상담 기록입니다.`);
-      lines.push("");
+
+      // 각 섹션: { title, lines: string[] } — lines는 여러 줄 가능
+      const sections = [];
 
       if (project.settings.includeFields.attitude && student.attitude) {
-        lines.push(`수업태도: ${student.attitude}`);
+        sections.push({ title: "수업태도", lines: splitMultiline(student.attitude) });
       }
       if (project.settings.includeFields.bookHomework && hasRatingMemo(student.bookHomework)) {
-        lines.push(`북숙제: ${formatRatingMemo(student.bookHomework)}`);
+        sections.push({ title: "북숙제", lines: splitMultiline(formatRatingMemo(student.bookHomework)) });
       }
       if (project.settings.includeFields.readi && hasRatingMemo(student.readi)) {
-        lines.push(`READi: ${formatRatingMemo(student.readi)}`);
+        sections.push({ title: "READi", lines: splitMultiline(formatRatingMemo(student.readi)) });
       }
       if (project.settings.includeFields.alex && hasRatingMemo(student.alex)) {
-        lines.push(`ALEX: ${formatRatingMemo(student.alex)}`);
+        sections.push({ title: "ALEX", lines: splitMultiline(formatRatingMemo(student.alex)) });
       }
       if (project.settings.includeFields.vocabTest && student.vocabTest) {
-        lines.push(`단어시험: ${student.vocabTest}`);
+        sections.push({ title: "단어시험", lines: splitMultiline(student.vocabTest) });
       }
       if (project.settings.includeFields.score && hasScore(score)) {
+        const scoreLines = [];
         const scoreBits = [];
         if (score.total) scoreBits.push(`총점 ${score.total}`);
         if (score.lc) scoreBits.push(`LC ${score.lc}`);
         if (score.rc) scoreBits.push(`RC ${score.rc}`);
         if (score.vo) scoreBits.push(`VO ${score.vo}`);
         if (score.gr) scoreBits.push(`GR ${score.gr}`);
-        if (scoreBits.length) lines.push(`${project.settings.testType} 성적: ${scoreBits.join(" / ")}`);
-        if (score.good) lines.push(`잘한 점: ${score.good}`);
-        if (score.problem) lines.push(`보완점: ${score.problem}`);
-        if (score.improvement) lines.push(`개선 방향: ${score.improvement}`);
+        if (scoreBits.length) scoreLines.push(scoreBits.join(" / "));
+        if (score.good) scoreLines.push(`잘한 점: ${score.good}`);
+        if (score.problem) scoreLines.push(`보완점: ${score.problem}`);
+        if (score.improvement) scoreLines.push(`개선 방향: ${score.improvement}`);
+        if (scoreLines.length) {
+          sections.push({ title: `${project.settings.testType} 성적`, lines: scoreLines.flatMap(splitMultiline) });
+        }
       }
       if (project.settings.includeFields.lowScoreCare && student.lowScoreCare) {
-        lines.push(`저득점 관리: ${student.lowScoreCare}`);
+        sections.push({ title: "저득점 관리", lines: splitMultiline(student.lowScoreCare) });
       }
       project.settings.extraFields.forEach(field => {
         const value = student.extraFieldValues?.[field.id];
-        if (value) lines.push(`${field.name}: ${value}`);
+        if (value) sections.push({ title: field.name, lines: splitMultiline(value) });
       });
       if (project.settings.includeFields.specialNote && student.specialNote) {
-        lines.push(`특이사항: ${student.specialNote}`);
+        sections.push({ title: "특이사항", lines: splitMultiline(student.specialNote) });
       }
       if (project.settings.includeFields.springSchedule) {
         const schedule = project.settings.schedule[student.classType] || {};
@@ -1719,15 +1953,36 @@
         if (project.settings.includeFields.springScheduleItems?.eopAlexAward !== false && schedule.eopAlexAward) scheduleLines.push(`EOP/ALEX Award ${schedule.eopAlexAward}`);
         if (project.settings.includeFields.springScheduleItems?.marketDay !== false && schedule.marketDay) scheduleLines.push(`Market Day ${schedule.marketDay}`);
         if (schedule.summerStart) scheduleLines.push(`여름학기 시작 ${schedule.summerStart}`);
-        if (scheduleLines.length) lines.push(`주요 일정: ${scheduleLines.join(" / ")}`);
+        if (scheduleLines.length) sections.push({ title: "주요 일정", lines: scheduleLines });
       }
       if (project.settings.includeFields.summerSpecial) {
-        lines.push("여름특강 관련 안내가 필요한 경우 별도로 안내드리겠습니다.");
+        sections.push({ title: "여름특강 안내", lines: ["여름특강 관련 안내가 필요한 경우 별도로 안내드리겠습니다."] });
       }
       if (project.settings.includeFields.registration) {
-        lines.push("등록 관련 안내가 필요한 경우 학원으로 문의 부탁드립니다.");
+        sections.push({ title: "등록 안내", lines: ["등록 관련 안내가 필요한 경우 학원으로 문의 부탁드립니다."] });
       }
-      return lines.filter((line, idx, arr) => !(line === "" && arr[idx - 1] === "")).join("\n").trim();
+
+      // 렌더링: 헤더 + 빈 줄 + (번호. 소제목 / 들여쓴 내용 / 빈 줄) 반복
+      const out = [];
+      out.push(`[${title}]`);
+      out.push(`${student.name} (${student.className}) 상담 기록입니다.`);
+      out.push("");
+
+      sections.forEach((section, i) => {
+        out.push(`${i + 1}. ${section.title}`);
+        section.lines.forEach(line => {
+          // 빈 줄은 들여쓰기 없이 공백 라인으로
+          out.push(line.trim() === "" ? "" : INDENT + line);
+        });
+        out.push(""); // 섹션 사이 빈 줄
+      });
+
+      // 마지막 trailing 빈 줄 제거
+      return out.join("\n").replace(/\n+$/, "");
+    }
+
+    function splitMultiline(text) {
+      return String(text ?? "").replace(/\r\n/g, "\n").split("\n");
     }
 
     function hasRatingMemo(obj) {
@@ -1916,12 +2171,40 @@
 
     function renderAuthState() {
       const info = $("authInfo");
+      const infoTop = $("authInfoTop");
+      const emailEl = $("authEmail");
+      const pwdEl = $("authPassword");
+      const loginBtn = $("loginBtn");
+      const logoutBtn = $("logoutBtn");
+
       if (!firebaseReady) {
+        // Firebase 미설정: 입력란 숨기고 경고 뱃지 표시
         info.textContent = "Firebase 설정값이 비어 있습니다. 로컬 저장과 JSON 백업은 그대로 사용할 수 있습니다.";
+        infoTop.textContent = "⚠ Firebase 미설정";
+        infoTop.className = "auth-info warn";
+        infoTop.hidden = false;
+        emailEl.hidden = true;
+        pwdEl.hidden = true;
+        loginBtn.hidden = true;
+        logoutBtn.hidden = true;
       } else if (currentUser) {
+        // 로그인 상태: 입력란 숨기고 이메일 + 로그아웃 버튼 표시
         info.textContent = `로그인됨: ${currentUser.email}`;
+        infoTop.textContent = `✓ ${currentUser.email}`;
+        infoTop.className = "auth-info ok";
+        infoTop.hidden = false;
+        emailEl.hidden = true;
+        pwdEl.hidden = true;
+        loginBtn.hidden = true;
+        logoutBtn.hidden = false;
       } else {
+        // Firebase 연결됨, 미로그인: 입력란 + 로그인 버튼 표시
         info.textContent = "Firebase는 연결되었습니다. Firestore 규칙이 로그인 필수라면 이메일 로그인 후 저장하세요.";
+        infoTop.hidden = true;
+        emailEl.hidden = false;
+        pwdEl.hidden = false;
+        loginBtn.hidden = false;
+        logoutBtn.hidden = true;
       }
     }
 
