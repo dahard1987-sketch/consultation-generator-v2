@@ -1333,6 +1333,10 @@ async function initFirebase() {
     auth = fb.getAuth(firebaseApp);
     firebaseReady = true;
     project.sync.firebaseEnabled = true;
+    fb.getRedirectResult(auth).catch((error) => {
+      console.error(error);
+      setServerStatus("로그인 확인 실패");
+    });
     fb.onAuthStateChanged(auth, (user) => {
       currentUser = user || null;
       renderAuthState();
@@ -1367,7 +1371,9 @@ function renderAuthState() {
     loginBtn.hidden = true;
     logoutBtn.hidden = false;
   } else {
-    info.textContent = "구글 로그인 후 서버 저장을 사용할 수 있습니다. 로그인하지 않아도 로컬 작업은 가능합니다.";
+    info.textContent = location.protocol === "file:"
+      ? "구글 로그인은 로컬 서버 주소에서 더 안정적으로 동작합니다. 로그인하지 않아도 로컬 작업은 가능합니다."
+      : "구글 로그인 후 서버 저장을 사용할 수 있습니다. 로그인하지 않아도 로컬 작업은 가능합니다.";
     infoTop.textContent = "미로그인";
     infoTop.className = "auth-info warn";
     infoTop.hidden = false;
@@ -1384,7 +1390,22 @@ async function loginWithGoogle() {
     showToast("구글 로그인 완료");
   } catch (error) {
     console.error(error);
-    alert(`로그인 실패: ${error.message || error}`);
+    const code = error?.code || "";
+    if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/popup-closed-by-user") {
+      try {
+        const provider = new fb.GoogleAuthProvider();
+        await fb.signInWithRedirect(auth, provider);
+        return;
+      } catch (redirectError) {
+        console.error(redirectError);
+        alert(`로그인 실패: ${redirectError.message || redirectError}`);
+        return;
+      }
+    }
+    const fileHint = location.protocol === "file:"
+      ? "\n\n현재 파일을 직접 열고 있다면 로그인 제한이 생길 수 있습니다. 이 폴더에서 로컬 서버를 띄운 뒤 http://localhost 주소로 접속해 주세요."
+      : "";
+    alert(`로그인 실패: ${error.message || error}${fileHint}`);
   }
 }
 
@@ -1405,6 +1426,10 @@ async function saveProjectToFirebase() {
   saveProjectToLocalStorageNow();
   if (!firebaseReady || !db) {
     if (confirm("서버에 연결되어 있지 않습니다. 현재 프로젝트를 JSON 파일로 저장할까요?")) saveProjectAsJSON();
+    return;
+  }
+  if (!currentUser) {
+    alert("서버 저장은 구글 로그인 후 사용할 수 있습니다.");
     return;
   }
   const projectId = makeProjectId(project);
@@ -1468,6 +1493,7 @@ async function saveProjectToFirebase() {
 
 async function loadProjectFromFirebase() {
   if (!firebaseReady || !db) return alert("서버 설정이 필요합니다.");
+  if (!currentUser) return alert("서버 불러오기는 구글 로그인 후 사용할 수 있습니다.");
   if (project.sync.hasUnsavedChanges && !confirm("현재 저장되지 않은 변경사항이 있습니다. 서버 데이터로 덮어쓸까요?")) return;
   const projectId = makeProjectId(project);
   setServerStatus("서버에서 불러오는 중...");

@@ -701,33 +701,33 @@
     <!-- ============================= TOP BAR ============================= -->
         <header class="topbar no-print">
       <div class="topbar-brand">
-        <h1>???? ???</h1>
+        <h1>상담기록 생성기</h1>
         <div class="topbar-badges">
-          <span class="badge" id="studentCountBadge">?? 0?</span>
-          <span class="badge warn" id="unsavedBadge">?? ?? ??</span>
-          <span class="badge" id="firebaseBadge">?? ?? ?? ?</span>
+          <span class="badge" id="studentCountBadge">학생 0명</span>
+          <span class="badge warn" id="unsavedBadge">서버 저장 필요</span>
+          <span class="badge" id="firebaseBadge">서버 확인 중</span>
         </div>
       </div>
       <div class="topbar-tools">
         <div class="auth-bar">
-          <button id="loginBtn" type="button" class="primary">?? ???</button>
+          <button id="loginBtn" type="button" class="primary">구글 로그인</button>
           <span id="authInfoTop" class="auth-info" hidden></span>
-          <button id="logoutBtn" class="ghost" type="button" hidden>????</button>
+          <button id="logoutBtn" class="ghost" type="button" hidden>로그아웃</button>
         </div>
         <div class="topbar-divider"></div>
         <div class="topbar-actions">
-          <button id="saveServerBtn" class="primary" type="button" title="Ctrl+S? ??? ??">?? ??</button>
-          <button id="loadServerBtn" type="button">?? ????</button>
+          <button id="saveServerBtn" class="primary" type="button" title="Ctrl+S로 서버 저장">서버 저장</button>
+          <button id="loadServerBtn" type="button">서버 불러오기</button>
           <div class="more-wrap">
-            <button id="moreBtn" class="ghost" type="button" aria-haspopup="menu" aria-expanded="false">???</button>
+            <button id="moreBtn" class="ghost" type="button" aria-haspopup="menu" aria-expanded="false">더보기</button>
             <div id="moreMenu" class="more-menu" role="menu">
-              <button id="saveJsonBtn" type="button">JSON ??</button>
-              <button id="loadJsonBtn" type="button">JSON ????</button>
-              <button id="exportTxtVerticalBtn" type="button">TXT ??: ???</button>
-              <button id="exportTxtTsvBtn" type="button">TXT ??: ? ??</button>
-              <button id="showLocalProjectsBtn" type="button">?? ???? ??</button>
+              <button id="saveJsonBtn" type="button">JSON 저장</button>
+              <button id="loadJsonBtn" type="button">JSON 불러오기</button>
+              <button id="exportTxtVerticalBtn" type="button">TXT 내보내기: 세로형</button>
+              <button id="exportTxtTsvBtn" type="button">TXT 내보내기: 한 줄형</button>
+              <button id="showLocalProjectsBtn" type="button">로컬 프로젝트 목록</button>
               <div class="menu-divider"></div>
-              <button id="newProjectBtn" type="button">? ????</button>
+              <button id="newProjectBtn" type="button">새 프로젝트</button>
             </div>
           </div>
         </div>
@@ -739,32 +739,32 @@
     <div class="grid">
       <aside class="sidebar no-print">
         <div class="status-mini">
-          <div class="status-row"><strong>??</strong><span id="localSaveStatus">-</span></div>
-          <div class="status-row"><strong>??</strong><span id="serverSaveStatus">-</span></div>
+          <div class="status-row"><strong>로컬</strong><span id="localSaveStatus">-</span></div>
+          <div class="status-row"><strong>서버</strong><span id="serverSaveStatus">-</span></div>
           <div class="status-meta">
-            <span id="dirtyCount">??? ?? 0?</span> ? ??? ?? <span id="lastSavedAtView">-</span>
+            <span id="dirtyCount">변경된 학생 0명</span> · 마지막 저장 <span id="lastSavedAtView">-</span>
           </div>
         </div>
 
         <details class="side-section" open>
-          <summary>?? ?? ??</summary>
+          <summary>프로젝트 설정</summary>
           <div class="side-body">
             <div class="form-grid">
               <div class="full">
-                <label for="teacherName">???</label>
-                <input id="teacherName" list="teacherList" placeholder="?: ???" autocomplete="off" />
+                <label for="teacherName">담당자</label>
+                <input id="teacherName" list="teacherList" placeholder="예: 최영진" autocomplete="off" />
                 <datalist id="teacherList">
-                  <option value="???"></option>
-                  <option value="????"></option>
-                  <option value="????"></option>
+                  <option value="최영진"></option>
+                  <option value="김민재"></option>
+                  <option value="박보경"></option>
                 </datalist>
               </div>
               <div>
-                <label for="year">??</label>
+                <label for="year">연도</label>
                 <input id="year" value="26" />
               </div>
               <div>
-                <label for="semester">?? ??</label>
+                <label for="semester">현재 학기</label>
                 <select id="semester">
                   <option value="SP">SP</option>
                   <option value="SU">SU</option>
@@ -773,7 +773,7 @@
                 </select>
               </div>
               <div>
-                <label for="nextSemester">?? ??</label>
+                <label for="nextSemester">다음 학기</label>
                 <select id="nextSemester">
                   <option value="SP">SP</option>
                   <option value="SU">SU</option>
@@ -782,7 +782,7 @@
                 </select>
               </div>
               <div>
-                <label for="testType">??</label>
+                <label for="testType">시험</label>
                 <select id="testType">
                   <option value="MT1">MT1</option>
                   <option value="MT2" selected>MT2</option>
@@ -792,79 +792,79 @@
                 </select>
               </div>
               <div>
-                <label for="consultationType">??</label>
+                <label for="consultationType">차수</label>
                 <select id="consultationType">
-                  <option value="1???">1? ??</option>
-                  <option value="2???">2? ??</option>
-                  <option value="3???" selected>3? ??</option>
-                  <option value="4???">4? ??</option>
-                  <option value="????">?? ??</option>
-                  <option value="????">?? ??</option>
+                  <option value="1차정기">1차 정기</option>
+                  <option value="2차정기">2차 정기</option>
+                  <option value="3차정기" selected>3차 정기</option>
+                  <option value="4차정기">4차 정기</option>
+                  <option value="학기상담">학기 상담</option>
+                  <option value="보충상담">보충 상담</option>
                 </select>
               </div>
               <div>
-                <label for="pageSize">? ??? ?? ?</label>
+                <label for="pageSize">한 페이지 학생 수</label>
                 <select id="pageSize">
-                  <option value="5">5?</option>
-                  <option value="10">10?</option>
-                  <option value="15">15?</option>
-                  <option value="20" selected>20?</option>
+                  <option value="5">5명</option>
+                  <option value="10">10명</option>
+                  <option value="15">15명</option>
+                  <option value="20" selected>20명</option>
                 </select>
               </div>
               <div class="full">
-                <label for="projectName">?????</label>
-                <input id="projectName" placeholder="?? ?? ?? ?? ??" />
+                <label for="projectName">프로젝트명</label>
+                <input id="projectName" placeholder="자동 생성 또는 직접 입력" />
               </div>
               <div class="full">
-                <label>???? ID</label>
+                <label>프로젝트 ID</label>
                 <div id="projectIdView" class="project-id mono"></div>
               </div>
             </div>
-            <div id="authInfo" class="notice" style="margin-top:10px; font-size:12px;">?? ?? ?? ?...</div>
+            <div id="authInfo" class="notice" style="margin-top:10px; font-size:12px;">서버 연결 확인 중...</div>
           </div>
         </details>
 
         <details class="side-section">
-          <summary>?? ??</summary>
+          <summary>포함 항목</summary>
           <div class="side-body">
             <div id="includeFields" class="checkbox-grid"></div>
           </div>
         </details>
 
         <details class="side-section">
-          <summary>?? ??</summary>
+          <summary>일정 안내</summary>
           <div class="side-body">
-            <div class="help" style="margin-bottom:10px;">1, 2? ????? ? ?? ? ??? ?? ???, 3? ????? ?? ??? ???? ?? ??? ?? ?????.</div>
-            <div class="sub-head">3D ??</div>
+            <div class="help" style="margin-bottom:10px;">상담문 하단에 넣을 학기 일정을 2D/3D별로 관리합니다. 비워둔 일정은 상담문에 포함되지 않습니다.</div>
+            <div class="sub-head">3D 일정</div>
             <div class="form-grid">
-              <div><label for="schedule3DFirstReaction">? ?? ? ??</label><input id="schedule3DFirstReaction" /></div>
-              <div><label for="schedule3DTestPlan">?? ??</label><input id="schedule3DTestPlan" /></div>
+              <div><label for="schedule3DFirstReaction">다음 학기 첫 반응</label><input id="schedule3DFirstReaction" /></div>
+              <div><label for="schedule3DTestPlan">시험 계획</label><input id="schedule3DTestPlan" /></div>
               <div><label for="schedule3DEopAlexAward">EOP/ALEX</label><input id="schedule3DEopAlexAward" /></div>
               <div><label for="schedule3DMarketDay">Market Day</label><input id="schedule3DMarketDay" /></div>
-              <div><label for="schedule3DSummerStart">?? ?? ??</label><input id="schedule3DSummerStart" /></div>
-              <div><label for="schedule3DTermEnd">?? ???</label><input id="schedule3DTermEnd" /></div>
+              <div><label for="schedule3DSummerStart">다음 학기 시작</label><input id="schedule3DSummerStart" /></div>
+              <div><label for="schedule3DTermEnd">현재 학기 종료</label><input id="schedule3DTermEnd" /></div>
             </div>
-            <div class="sub-head">2D ??</div>
+            <div class="sub-head">2D 일정</div>
             <div class="form-grid">
-              <div><label for="schedule2DFirstReaction">? ?? ? ??</label><input id="schedule2DFirstReaction" /></div>
-              <div><label for="schedule2DTestPlan">?? ??</label><input id="schedule2DTestPlan" /></div>
+              <div><label for="schedule2DFirstReaction">다음 학기 첫 반응</label><input id="schedule2DFirstReaction" /></div>
+              <div><label for="schedule2DTestPlan">시험 계획</label><input id="schedule2DTestPlan" /></div>
               <div><label for="schedule2DEopAlexAward">EOP/ALEX</label><input id="schedule2DEopAlexAward" /></div>
               <div><label for="schedule2DMarketDay">Market Day</label><input id="schedule2DMarketDay" /></div>
-              <div><label for="schedule2DSummerStart">?? ?? ??</label><input id="schedule2DSummerStart" /></div>
-              <div><label for="schedule2DTermEnd">?? ???</label><input id="schedule2DTermEnd" /></div>
+              <div><label for="schedule2DSummerStart">다음 학기 시작</label><input id="schedule2DSummerStart" /></div>
+              <div><label for="schedule2DTermEnd">현재 학기 종료</label><input id="schedule2DTermEnd" /></div>
             </div>
           </div>
         </details>
 
         <details class="side-section">
-          <summary>?? ?? ??</summary>
+          <summary>자유 추가 항목</summary>
           <div class="side-body">
             <div class="form-grid one">
               <div>
-                <label for="extraFieldName">???</label>
-                <input id="extraFieldName" placeholder="?: ?? ?? ???" />
+                <label for="extraFieldName">항목명</label>
+                <input id="extraFieldName" placeholder="예: 진급 가능성" />
               </div>
-              <button id="addExtraFieldBtn" type="button">?? ?? ???</button>
+              <button id="addExtraFieldBtn" type="button">추가 항목 만들기</button>
               <div id="extraFieldsList"></div>
             </div>
           </div>
@@ -878,43 +878,43 @@
             <section>
               <div class="toolbar no-print">
                 <div>
-                  <label for="searchInput">?? ??</label>
-                  <input id="searchInput" placeholder="?? ?? ?" />
+                  <label for="searchInput">학생 검색</label>
+                  <input id="searchInput" placeholder="이름 또는 반" />
                 </div>
                 <div>
-                  <label for="classFilter">?</label>
-                  <select id="classFilter"><option value="">??</option></select>
+                  <label for="classFilter">반</label>
+                  <select id="classFilter"><option value="">전체</option></select>
                 </div>
                 <div>
-                  <label for="completionFilter">??</label>
+                  <label for="completionFilter">상태</label>
                   <select id="completionFilter">
-                    <option value="all">??</option>
-                    <option value="dirty">?? ??</option>
-                    <option value="incomplete">???</option>
-                    <option value="complete">?? ??</option>
+                    <option value="all">전체</option>
+                    <option value="dirty">저장 필요</option>
+                    <option value="incomplete">미입력</option>
+                    <option value="complete">입력 완료</option>
                   </select>
                 </div>
                 <div>
-                  <label>?? ??</label>
-                  <div class="notice" style="padding:10px;">???? ?? ?? ?? ?? ???? ?????.</div>
+                  <label>작업 안내</label>
+                  <div class="notice" style="padding:10px;">학생 목록을 먼저 넣은 뒤, 탭별로 상담 내용을 입력하세요.</div>
                 </div>
               </div>
 
               <div id="bulkTools" class="no-print"></div>
               <div id="studentsContainer"></div>
               <div class="actions no-print" style="justify-content:center; margin-top:14px;">
-                <button id="prevPageBtn" type="button">?? ???</button>
+                <button id="prevPageBtn" type="button">이전 페이지</button>
                 <span class="badge" id="pageInfo">1 / 1</span>
-                <button id="nextPageBtn" type="button">?? ???</button>
+                <button id="nextPageBtn" type="button">다음 페이지</button>
               </div>
             </section>
 
             <aside class="preview-wrap">
               <div class="preview-header">
-                <h2>??? ????</h2>
+                <h2>상담문 미리보기</h2>
                 <div class="actions no-print">
-                  <button class="small primary" id="copyCurrentBtn" type="button">?? ?? ??</button>
-                  <button class="small" id="copyAllBtn" type="button">?? ??</button>
+                  <button class="small primary" id="copyCurrentBtn" type="button">현재 학생 복사</button>
+                  <button class="small" id="copyAllBtn" type="button">전체 복사</button>
                 </div>
               </div>
               <select id="previewStudentSelect" class="no-print" style="margin-bottom:10px;"></select>
@@ -926,9 +926,9 @@
 
       <aside class="progress-sidebar no-print">
         <div class="side-section" open>
-          <summary>?? ??</summary>
+          <summary>진행 현황</summary>
           <div class="side-body">
-            <div id="progressSummary" class="help">??? ????.</div>
+            <div id="progressSummary" class="help">학생을 입력하세요.</div>
             <div id="progressList" class="progress-list"></div>
           </div>
         </div>
@@ -939,8 +939,8 @@
   <div class="modal-backdrop no-print" id="localProjectsModal">
     <div class="modal">
       <header>
-        <h3>?? ?? ???? ??</h3>
-        <button class="ghost" id="closeLocalProjectsBtn" type="button">??</button>
+        <h3>로컬 저장 프로젝트 목록</h3>
+        <button class="ghost" id="closeLocalProjectsBtn" type="button">닫기</button>
       </header>
       <main>
         <div id="localProjectsList" class="local-list"></div>
