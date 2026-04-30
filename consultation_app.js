@@ -1331,7 +1331,14 @@ async function initFirebase() {
     fb = { ...appMod, ...firestoreMod, ...authMod };
     firebaseApp = fb.initializeApp(firebaseConfig);
     db = fb.getFirestore(firebaseApp);
-    auth = fb.getAuth(firebaseApp);
+    try {
+      auth = fb.initializeAuth(firebaseApp, {
+        persistence: fb.browserLocalPersistence,
+        popupRedirectResolver: fb.browserPopupRedirectResolver
+      });
+    } catch (error) {
+      auth = fb.getAuth(firebaseApp);
+    }
     googleProvider = new fb.GoogleAuthProvider();
     firebaseReady = true;
     project.sync.firebaseEnabled = true;
@@ -1383,7 +1390,7 @@ function renderAuthState() {
 async function loginWithGoogle() {
   if (!firebaseReady || !auth) return alert("서버 설정이 필요합니다.");
   try {
-    await fb.signInWithPopup(auth, googleProvider);
+    await fb.signInWithPopup(auth, googleProvider, fb.browserPopupRedirectResolver);
     showToast("구글 로그인 완료");
   } catch (error) {
     console.error(error);
