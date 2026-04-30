@@ -102,6 +102,7 @@ function createDefaultProject() {
       projectId: "",
       settingsDirty: false,
       dirtyStudentIds: {},
+      deletedStudentIds: {},
       hasUnsavedChanges: false,
       lastServerSavedAt: "",
       lastServerLoadedAt: "",
@@ -258,7 +259,8 @@ function normalizeProjectShape(raw) {
     sync: {
       ...base.sync,
       ...(raw?.sync || {}),
-      dirtyStudentIds: raw?.sync?.dirtyStudentIds || {}
+      dirtyStudentIds: raw?.sync?.dirtyStudentIds || {},
+      deletedStudentIds: raw?.sync?.deletedStudentIds || {}
     },
     students: Array.isArray(raw?.students) ? raw.students : []
   };
@@ -462,6 +464,7 @@ function bindEvents() {
   $("saveServerBtn").addEventListener("click", saveProjectToFirebase);
   $("loadServerBtn").addEventListener("click", loadProjectFromFirebase);
   $("newProjectBtn").addEventListener("click", createNewProject);
+  $("clearProjectDataBtn").addEventListener("click", clearCurrentProjectData);
   $("addExtraFieldBtn").addEventListener("click", addExtraField);
   $("showLocalProjectsBtn").addEventListener("click", showLocalProjectsModal);
   $("closeLocalProjectsBtn").addEventListener("click", () => $("localProjectsModal").classList.remove("show"));
@@ -1143,8 +1146,20 @@ function getScheduleLines(student) {
   return lines;
 }
 
+function buildConsultationTitle() {
+  const settings = project.settings || {};
+  const rawYear = String(settings.year || "").trim();
+  const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+  const semester = SEMESTER_LABELS[settings.semester] || settings.semester || "";
+  const consultationType = displayConsultationType(settings.consultationType)
+    .replace(/\s*정기/g, "")
+    .replace(/\s*상담$/g, "")
+    .trim();
+  return [`${year} ${semester}`.trim(), consultationType, "상담"].filter(Boolean).join(" ");
+}
+
 function buildConsultationText(student) {
-  const title = project.projectName || makeAutoProjectName();
+  const title = buildConsultationTitle();
   const score = getScore(student);
   const sections = [];
   if (project.settings.includeFields.attitude && student.attitude) sections.push({ title: "수업태도", lines: splitMultiline(student.attitude) });
@@ -1170,7 +1185,7 @@ function buildConsultationText(student) {
   const scheduleLines = getScheduleLines(student);
   if (scheduleLines.length) sections.push({ title: "일정 안내", lines: scheduleLines });
 
-  const out = [`[${title}]`, `${student.name} (${student.className}) 상담 기록입니다.`, ""];
+  const out = [`[${title}]`, ""];
   sections.forEach((section, index) => {
     out.push(`${index + 1}. ${section.title}`);
     section.lines.forEach((line) => out.push(line.trim() ? `   ${line}` : ""));
@@ -1204,31 +1219,65 @@ function copyAllConsultationTexts() {
   copyText(project.students.map((student) => buildConsultationText(student)).join("\n\n------------------------------\n\n"));
 }
 
-function downloadTextFile(filename, content) {
-  const blob = new Blob([content], { type: "text/plain;charset=utf-8" });
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = filename;
-  document.body.appendChild(a);
-  a.click();
-  URL.revokeObjectURL(a.href);
-  a.remove();
+function openCopyPopup(title, content) {
+  const popup = window.open("", "_blank", "width=900,height=720");
+  if (!popup) {
+    copyText(content);
+    alert("팝업이 차단되어 텍스트를 클립보드에 복사했습니다.");
+    return;
+  }
+  popup.document.write(`<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>${escapeHtml(title)}</title>
+  <style>
+    body { margin: 0; padding: 18px; font-family: "Noto Sans KR", system-ui, sans-serif; background: #f4f6fb; color: #111827; }
+    header { display: flex; justify-content: space-between; align-items: center; gap: 12px; margin-bottom: 12px; }
+    h1 { margin: 0; font-size: 18px; }
+    button { border: 0; border-radius: 8px; padding: 9px 14px; background: #2563eb; color: #fff; font-weight: 700; cursor: pointer; }
+    textarea { width: 100%; height: calc(100vh - 92px); box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 10px; padding: 14px; font: 14px/1.6 "Noto Sans KR", system-ui, sans-serif; resize: none; background: #fff; color: #111827; }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>${escapeHtml(title)}</h1>
+    <button id="copyBtn" type="button">전체 복사</button>
+  </header>
+  <textarea id="exportText">${escapeHtml(content)}</textarea>
+  <script>
+    const textarea = document.getElementById("exportText");
+    document.getElementById("copyBtn").addEventListener("click", async () => {
+      textarea.focus();
+      textarea.select();
+      try {
+        await navigator.clipboard.writeText(textarea.value);
+      } catch {
+        document.execCommand("copy");
+      }
+    });
+    textarea.focus();
+    textarea.select();
+  <\/script>
+</body>
+</html>`);
+  popup.document.close();
 }
 
 function exportConsultationTxt(mode) {
   if (project.students.length === 0) return alert("내보낼 학생이 없습니다.");
-  const filename = `${makeProjectId(project) || "consultation"}_${mode}.txt`;
   if (mode === "vertical") {
-    const content = project.students.map((student) => `${student.name} ${buildConsultationText(student)}`).join("\r\n\r\n");
-    downloadTextFile(filename, content);
+    const content = project.students.map((student) => buildConsultationText(student)).join("\n\n------------------------------\n\n");
+    openCopyPopup("TXT 내보내기: 세로형", content);
     return;
   }
   const content = project.students.map((student) => {
     const consultation = buildConsultationText(student).replace(/\t/g, " ").replace(/\r?\n/g, "\n");
     const escaped = `"${consultation.replace(/"/g, "\"\"")}"`;
     return `${student.name}\t${escaped}`;
-  }).join("\r\n");
-  downloadTextFile(filename, content);
+  }).join("\n");
+  openCopyPopup("TXT 내보내기: 한 줄형", content);
 }
 
 function saveProjectAsJSON() {
@@ -1308,6 +1357,29 @@ function createNewProject() {
   state.selectedStudentId = "";
   saveProjectToLocalStorageNow();
   renderAll();
+}
+
+function clearCurrentProjectData() {
+  if (project.students.length === 0) {
+    showToast("비울 학생 명단이 없습니다.");
+    return;
+  }
+  const message = "현재 프로젝트의 학생 명단과 입력한 상담 내용을 모두 비울까요?\n\n서버에 반영하려면 이후 '서버 저장'을 눌러주세요.";
+  if (!confirm(message)) return;
+  project.sync.deletedStudentIds = {
+    ...(project.sync.deletedStudentIds || {}),
+    ...Object.fromEntries(project.students.map((student) => [student.id, true]))
+  };
+  project.students = [];
+  project.sync.dirtyStudentIds = {};
+  project.sync.settingsDirty = true;
+  project.sync.hasUnsavedChanges = true;
+  state.selectedStudentId = "";
+  state.currentPage = 0;
+  state.activeCriterion = "roster";
+  saveProjectToLocalStorageNow();
+  renderAll();
+  showToast("현재 프로젝트 내용을 비웠습니다.");
 }
 
 function isFirebaseConfigured() {
@@ -1429,6 +1501,7 @@ async function saveProjectToFirebase() {
   setServerStatus("서버 저장 중...");
   try {
     const dirtyIds = Object.keys(project.sync.dirtyStudentIds || {});
+    const deletedIds = Object.keys(project.sync.deletedStudentIds || {});
     const dirtyStudents = project.students.filter((student) => dirtyIds.includes(student.id));
     if (project.sync.settingsDirty || !project.sync.lastServerSavedAt) {
       const metaRef = fb.doc(db, "consultationProjects", projectId);
@@ -1462,6 +1535,16 @@ async function saveProjectToFirebase() {
         await batch.commit();
       }
     }
+    if (deletedIds.length > 0) {
+      for (let i = 0; i < deletedIds.length; i += 400) {
+        const batch = fb.writeBatch(db);
+        deletedIds.slice(i, i + 400).forEach((studentId) => {
+          const ref = fb.doc(db, "consultationProjects", projectId, "students", studentId);
+          batch.delete(ref);
+        });
+        await batch.commit();
+      }
+    }
     const savedAt = new Date().toISOString();
     project.students.forEach((student) => {
       if (dirtyIds.includes(student.id)) {
@@ -1471,11 +1554,12 @@ async function saveProjectToFirebase() {
     });
     project.sync.settingsDirty = false;
     project.sync.dirtyStudentIds = {};
+    project.sync.deletedStudentIds = {};
     project.sync.hasUnsavedChanges = false;
     project.sync.lastServerSavedAt = savedAt;
     saveProjectToLocalStorageNow();
     renderAll({ keepPage: true });
-    showToast(`서버 저장 완료: 학생 ${dirtyStudents.length}명`);
+    showToast(`서버 저장 완료: 저장 ${dirtyStudents.length}명, 삭제 ${deletedIds.length}명`);
   } catch (error) {
     console.error(error);
     setServerStatus("서버 저장 실패");
@@ -1516,6 +1600,7 @@ async function loadProjectFromFirebase() {
     loaded.sync.lastServerSavedAt = new Date().toISOString();
     loaded.sync.hasUnsavedChanges = false;
     loaded.sync.dirtyStudentIds = {};
+    loaded.sync.deletedStudentIds = {};
     loaded.sync.settingsDirty = false;
     loaded.students.forEach((student) => {
       student._dirty = false;
