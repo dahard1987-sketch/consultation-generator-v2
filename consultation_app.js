@@ -51,6 +51,7 @@ let auth = null;
 let firebaseReady = false;
 let currentUser = null;
 let fb = {};
+let googleProvider = null;
 
 const state = {
   activeCriterion: "roster",
@@ -1331,12 +1332,9 @@ async function initFirebase() {
     firebaseApp = fb.initializeApp(firebaseConfig);
     db = fb.getFirestore(firebaseApp);
     auth = fb.getAuth(firebaseApp);
+    googleProvider = new fb.GoogleAuthProvider();
     firebaseReady = true;
     project.sync.firebaseEnabled = true;
-    fb.getRedirectResult(auth).catch((error) => {
-      console.error(error);
-      setServerStatus("로그인 확인 실패");
-    });
     fb.onAuthStateChanged(auth, (user) => {
       currentUser = user || null;
       renderAuthState();
@@ -1385,23 +1383,10 @@ function renderAuthState() {
 async function loginWithGoogle() {
   if (!firebaseReady || !auth) return alert("서버 설정이 필요합니다.");
   try {
-    const provider = new fb.GoogleAuthProvider();
-    await fb.signInWithPopup(auth, provider);
+    await fb.signInWithPopup(auth, googleProvider);
     showToast("구글 로그인 완료");
   } catch (error) {
     console.error(error);
-    const code = error?.code || "";
-    if (code === "auth/popup-blocked" || code === "auth/cancelled-popup-request" || code === "auth/popup-closed-by-user") {
-      try {
-        const provider = new fb.GoogleAuthProvider();
-        await fb.signInWithRedirect(auth, provider);
-        return;
-      } catch (redirectError) {
-        console.error(redirectError);
-        alert(`로그인 실패: ${redirectError.message || redirectError}`);
-        return;
-      }
-    }
     const fileHint = location.protocol === "file:"
       ? "\n\n현재 파일을 직접 열고 있다면 로그인 제한이 생길 수 있습니다. 이 폴더에서 로컬 서버를 띄운 뒤 http://localhost 주소로 접속해 주세요."
       : "";
