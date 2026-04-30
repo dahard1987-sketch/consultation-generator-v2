@@ -3,7 +3,7 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>상담기록 생성기 v2 - Firebase</title>
+  <title>상담기록 생성기 v2</title>
   <style>
     :root {
       --bg: #f4f6fb;
@@ -31,8 +31,9 @@
       margin: 0;
       background: var(--bg);
       color: var(--text);
-      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans KR", sans-serif;
+      font-family: "Noto Sans KR", sans-serif;
       line-height: 1.5;
+      overflow-y: auto;
     }
     button, input, select, textarea { font: inherit; }
     textarea { resize: vertical; min-height: 80px; }
@@ -213,9 +214,10 @@
     /* ====== MAIN GRID ====== */
     .grid {
       display: grid;
-      grid-template-columns: 300px 1fr;
+      grid-template-columns: 300px minmax(0, 1fr) 250px;
       gap: 14px;
       align-items: start;
+      min-height: 0;
     }
 
     /* ====== SIDEBAR ====== */
@@ -227,6 +229,7 @@
       top: 76px;
       max-height: calc(100vh - 90px);
       overflow-y: auto;
+      overscroll-behavior: contain;
       padding-right: 2px;
     }
     .sidebar::-webkit-scrollbar { width: 6px; }
@@ -290,7 +293,7 @@
     .form-grid.one { grid-template-columns: 1fr; }
     .full { grid-column: 1 / -1; }
     .help { font-size: 12px; color: var(--muted); margin-top: 5px; }
-    .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace; }
+    .mono { font-family: "Noto Sans KR", sans-serif; }
     .project-id {
       background: #f3f4f6;
       color: #374151;
@@ -439,6 +442,7 @@
       display: grid;
       grid-template-columns: 1fr 400px;
       gap: 16px;
+      min-width: 0;
     }
     .preview-wrap {
       position: sticky;
@@ -472,7 +476,96 @@
       overflow: auto;
       flex: 1;
       color: #1f2937;
-      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, "Noto Sans KR", sans-serif;
+      font-family: "Noto Sans KR", sans-serif;
+    }
+    .score-entry-card {
+      display: grid;
+      gap: 12px;
+    }
+    .bulk-score-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+    .bulk-score-table-wrap {
+      overflow: auto;
+      border: 1px solid var(--line);
+      border-radius: var(--radius);
+      background: #fff;
+    }
+    .bulk-score-table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+    .bulk-score-table th,
+    .bulk-score-table td {
+      border-bottom: 1px solid var(--line);
+      padding: 8px;
+      text-align: left;
+      vertical-align: middle;
+    }
+    .bulk-score-table th {
+      background: #f8fafc;
+      font-size: 12px;
+      white-space: nowrap;
+    }
+    .bulk-score-table input,
+    .bulk-score-table select {
+      min-width: 90px;
+      padding: 8px 9px;
+    }
+    .progress-sidebar {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      position: sticky;
+      top: 76px;
+      max-height: calc(100vh - 90px);
+      overflow-y: auto;
+      overscroll-behavior: contain;
+    }
+    .progress-list {
+      display: grid;
+      gap: 8px;
+      max-height: calc(100vh - 170px);
+      overflow: auto;
+      padding-right: 2px;
+    }
+    .progress-item {
+      display: grid;
+      grid-template-columns: auto 1fr auto;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 10px;
+      border: 1px solid var(--line);
+      border-radius: 10px;
+      background: #fff;
+      font-size: 12.5px;
+    }
+    .progress-item input[type="checkbox"] {
+      width: auto;
+      margin: 0;
+    }
+    .progress-name {
+      min-width: 0;
+      word-break: break-word;
+    }
+    .progress-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: #ef4444;
+      box-shadow: 0 0 0 2px rgba(239, 68, 68, 0.15);
+    }
+    .progress-dot.in-progress {
+      background: #f59e0b;
+      box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
+    }
+    .progress-dot.complete {
+      background: #10b981;
+      box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
     }
 
     .mini-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -574,6 +667,7 @@
     @media (max-width: 1200px) {
       .grid { grid-template-columns: 1fr; }
       .sidebar { position: static; max-height: none; }
+      .progress-sidebar { position: static; max-height: none; }
       .split { grid-template-columns: 1fr; }
       .preview-wrap { position: static; max-height: none; }
       .tabs { top: 0; }
@@ -588,13 +682,14 @@
       .form-grid { grid-template-columns: 1fr; }
       .checkbox-grid { grid-template-columns: 1fr; }
       .score-grid { grid-template-columns: repeat(2, 1fr); }
+      .bulk-score-actions { flex-direction: column; align-items: stretch; }
       .input-row { grid-template-columns: 1fr; }
       .student-head { align-items: flex-start; flex-direction: column; }
     }
 
     @media print {
       body { background: #fff; }
-      .no-print, .sidebar, .tabs, .toolbar, .student-card, .topbar { display: none !important; }
+      .no-print, .sidebar, .progress-sidebar, .tabs, .toolbar, .student-card, .topbar { display: none !important; }
       .grid, .split { display: block; }
       .main-panel { box-shadow: none; border: 0; }
       .preview-box { max-height: none; border: 0; }
@@ -604,75 +699,72 @@
 <body>
   <div class="app">
     <!-- ============================= TOP BAR ============================= -->
-    <header class="topbar no-print">
+        <header class="topbar no-print">
       <div class="topbar-brand">
-        <h1>📋 상담기록 생성기</h1>
+        <h1>???? ???</h1>
         <div class="topbar-badges">
-          <span class="badge" id="studentCountBadge">학생 0명</span>
-          <span class="badge warn" id="unsavedBadge">서버 미저장</span>
-          <span class="badge" id="firebaseBadge">Firebase 확인 중</span>
+          <span class="badge" id="studentCountBadge">?? 0?</span>
+          <span class="badge warn" id="unsavedBadge">?? ?? ??</span>
+          <span class="badge" id="firebaseBadge">?? ?? ?? ?</span>
         </div>
       </div>
       <div class="topbar-tools">
         <div class="auth-bar">
-          <input id="authEmail" type="email" placeholder="이메일" autocomplete="username" />
-          <input id="authPassword" type="password" placeholder="비밀번호" autocomplete="current-password" />
-          <button id="loginBtn" type="button" class="primary">로그인</button>
+          <button id="loginBtn" type="button" class="primary">?? ???</button>
           <span id="authInfoTop" class="auth-info" hidden></span>
-          <button id="logoutBtn" class="ghost" type="button" hidden>로그아웃</button>
+          <button id="logoutBtn" class="ghost" type="button" hidden>????</button>
         </div>
         <div class="topbar-divider"></div>
         <div class="topbar-actions">
-          <button id="saveServerBtn" class="primary" type="button" title="Ctrl+S로 빠르게 저장">💾 서버 저장</button>
-          <button id="loadServerBtn" type="button">서버 불러오기</button>
+          <button id="saveServerBtn" class="primary" type="button" title="Ctrl+S? ??? ??">?? ??</button>
+          <button id="loadServerBtn" type="button">?? ????</button>
           <div class="more-wrap">
-            <button id="moreBtn" class="ghost" type="button" aria-haspopup="menu" aria-expanded="false">더보기 ▾</button>
+            <button id="moreBtn" class="ghost" type="button" aria-haspopup="menu" aria-expanded="false">???</button>
             <div id="moreMenu" class="more-menu" role="menu">
-              <button id="saveJsonBtn" type="button">📄 JSON 저장</button>
-              <button id="loadJsonBtn" type="button">📂 JSON 불러오기</button>
-              <button id="showLocalProjectsBtn" type="button">🗂 로컬 프로젝트 목록</button>
+              <button id="saveJsonBtn" type="button">JSON ??</button>
+              <button id="loadJsonBtn" type="button">JSON ????</button>
+              <button id="exportTxtVerticalBtn" type="button">TXT ??: ???</button>
+              <button id="exportTxtTsvBtn" type="button">TXT ??: ? ??</button>
+              <button id="showLocalProjectsBtn" type="button">?? ???? ??</button>
               <div class="menu-divider"></div>
-              <button id="newProjectBtn" type="button">✨ 새 프로젝트</button>
+              <button id="newProjectBtn" type="button">? ????</button>
             </div>
           </div>
         </div>
       </div>
     </header>
     <input id="jsonFileInput" type="file" accept="application/json,.json" hidden />
+    <input id="scoreFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden />
 
-    <!-- ============================= MAIN GRID ============================= -->
     <div class="grid">
-      <!-- ====== SIDEBAR ====== -->
       <aside class="sidebar no-print">
-        <!-- 항상 표시되는 미니 상태 카드 -->
         <div class="status-mini">
-          <div class="status-row"><strong>로컬</strong><span id="localSaveStatus">-</span></div>
-          <div class="status-row"><strong>서버</strong><span id="serverSaveStatus">-</span></div>
+          <div class="status-row"><strong>??</strong><span id="localSaveStatus">-</span></div>
+          <div class="status-row"><strong>??</strong><span id="serverSaveStatus">-</span></div>
           <div class="status-meta">
-            <span id="dirtyCount">변경 0명</span> · 마지막: <span id="lastSavedAtView">-</span>
+            <span id="dirtyCount">??? ?? 0?</span> ? ??? ?? <span id="lastSavedAtView">-</span>
           </div>
         </div>
 
-        <!-- 기본 정보 (기본 펼침) -->
         <details class="side-section" open>
-          <summary>⚙️ 기본 정보</summary>
+          <summary>?? ?? ??</summary>
           <div class="side-body">
             <div class="form-grid">
               <div class="full">
-                <label for="teacherName">상담자</label>
-                <input id="teacherName" list="teacherList" placeholder="예: 최영진" autocomplete="off" />
+                <label for="teacherName">???</label>
+                <input id="teacherName" list="teacherList" placeholder="?: ???" autocomplete="off" />
                 <datalist id="teacherList">
-                  <option value="최영진"></option>
-                  <option value="김선생님"></option>
-                  <option value="이선생님"></option>
+                  <option value="???"></option>
+                  <option value="????"></option>
+                  <option value="????"></option>
                 </datalist>
               </div>
               <div>
-                <label for="year">연도</label>
+                <label for="year">??</label>
                 <input id="year" value="26" />
               </div>
               <div>
-                <label for="semester">학기</label>
+                <label for="semester">?? ??</label>
                 <select id="semester">
                   <option value="SP">SP</option>
                   <option value="SU">SU</option>
@@ -681,7 +773,16 @@
                 </select>
               </div>
               <div>
-                <label for="testType">시험</label>
+                <label for="nextSemester">?? ??</label>
+                <select id="nextSemester">
+                  <option value="SP">SP</option>
+                  <option value="SU">SU</option>
+                  <option value="FA">FA</option>
+                  <option value="WI">WI</option>
+                </select>
+              </div>
+              <div>
+                <label for="testType">??</label>
                 <select id="testType">
                   <option value="MT1">MT1</option>
                   <option value="MT2" selected>MT2</option>
@@ -691,75 +792,85 @@
                 </select>
               </div>
               <div>
-                <label for="consultationType">차수</label>
+                <label for="consultationType">??</label>
                 <select id="consultationType">
-                  <option value="1차정기">1차 정기</option>
-                  <option value="2차정기">2차 정기</option>
-                  <option value="3차정기" selected>3차 정기</option>
-                  <option value="4차정기">4차 정기</option>
-                  <option value="특별상담">특별 상담</option>
-                  <option value="보충상담">보충 상담</option>
+                  <option value="1???">1? ??</option>
+                  <option value="2???">2? ??</option>
+                  <option value="3???" selected>3? ??</option>
+                  <option value="4???">4? ??</option>
+                  <option value="????">?? ??</option>
+                  <option value="????">?? ??</option>
+                </select>
+              </div>
+              <div>
+                <label for="pageSize">? ??? ?? ?</label>
+                <select id="pageSize">
+                  <option value="5">5?</option>
+                  <option value="10">10?</option>
+                  <option value="15">15?</option>
+                  <option value="20" selected>20?</option>
                 </select>
               </div>
               <div class="full">
-                <label for="projectName">프로젝트명</label>
-                <input id="projectName" placeholder="자동 생성 또는 직접 입력" />
+                <label for="projectName">?????</label>
+                <input id="projectName" placeholder="?? ?? ?? ?? ??" />
               </div>
               <div class="full">
-                <label>프로젝트 ID</label>
+                <label>???? ID</label>
                 <div id="projectIdView" class="project-id mono"></div>
               </div>
             </div>
-            <div id="authInfo" class="notice" style="margin-top:10px; font-size:12px;">Firebase 확인 중...</div>
+            <div id="authInfo" class="notice" style="margin-top:10px; font-size:12px;">?? ?? ?? ?...</div>
           </div>
         </details>
 
-        <!-- 포함 항목 -->
         <details class="side-section">
-          <summary>✅ 포함 항목</summary>
+          <summary>?? ??</summary>
           <div class="side-body">
             <div id="includeFields" class="checkbox-grid"></div>
           </div>
         </details>
 
-        <!-- 일정 -->
         <details class="side-section">
-          <summary>📅 일정</summary>
+          <summary>?? ??</summary>
           <div class="side-body">
-            <div class="sub-head">3D 일정</div>
+            <div class="help" style="margin-bottom:10px;">1, 2? ????? ? ?? ? ??? ?? ???, 3? ????? ?? ??? ???? ?? ??? ?? ?????.</div>
+            <div class="sub-head">3D ??</div>
             <div class="form-grid">
-              <div><label for="schedule3DTermTest">Term Test</label><input id="schedule3DTermTest" /></div>
+              <div><label for="schedule3DFirstReaction">? ?? ? ??</label><input id="schedule3DFirstReaction" /></div>
+              <div><label for="schedule3DTestPlan">?? ??</label><input id="schedule3DTestPlan" /></div>
               <div><label for="schedule3DEopAlexAward">EOP/ALEX</label><input id="schedule3DEopAlexAward" /></div>
               <div><label for="schedule3DMarketDay">Market Day</label><input id="schedule3DMarketDay" /></div>
-              <div><label for="schedule3DSummerStart">Summer</label><input id="schedule3DSummerStart" /></div>
+              <div><label for="schedule3DSummerStart">?? ?? ??</label><input id="schedule3DSummerStart" /></div>
+              <div><label for="schedule3DTermEnd">?? ???</label><input id="schedule3DTermEnd" /></div>
             </div>
-            <div class="sub-head">2D 일정</div>
+            <div class="sub-head">2D ??</div>
             <div class="form-grid">
-              <div><label for="schedule2DTermTest">Term Test</label><input id="schedule2DTermTest" /></div>
+              <div><label for="schedule2DFirstReaction">? ?? ? ??</label><input id="schedule2DFirstReaction" /></div>
+              <div><label for="schedule2DTestPlan">?? ??</label><input id="schedule2DTestPlan" /></div>
               <div><label for="schedule2DEopAlexAward">EOP/ALEX</label><input id="schedule2DEopAlexAward" /></div>
               <div><label for="schedule2DMarketDay">Market Day</label><input id="schedule2DMarketDay" /></div>
-              <div><label for="schedule2DSummerStart">Summer</label><input id="schedule2DSummerStart" /></div>
+              <div><label for="schedule2DSummerStart">?? ?? ??</label><input id="schedule2DSummerStart" /></div>
+              <div><label for="schedule2DTermEnd">?? ???</label><input id="schedule2DTermEnd" /></div>
             </div>
           </div>
         </details>
 
-        <!-- 자유 추가 항목 -->
         <details class="side-section">
-          <summary>➕ 자유 추가 항목</summary>
+          <summary>?? ?? ??</summary>
           <div class="side-body">
             <div class="form-grid one">
               <div>
-                <label for="extraFieldName">항목명</label>
-                <input id="extraFieldName" placeholder="예: 진급 가능성" />
+                <label for="extraFieldName">???</label>
+                <input id="extraFieldName" placeholder="?: ?? ?? ???" />
               </div>
-              <button id="addExtraFieldBtn" type="button">추가 항목 만들기</button>
+              <button id="addExtraFieldBtn" type="button">?? ?? ???</button>
               <div id="extraFieldsList"></div>
             </div>
           </div>
         </details>
       </aside>
 
-      <!-- ====== MAIN PANEL ====== -->
       <main class="main-panel">
         <div class="tabs no-print" id="criterionTabs"></div>
         <div class="panel-body">
@@ -767,47 +878,43 @@
             <section>
               <div class="toolbar no-print">
                 <div>
-                  <label for="searchInput">학생 검색</label>
-                  <input id="searchInput" placeholder="이름 또는 반" />
+                  <label for="searchInput">?? ??</label>
+                  <input id="searchInput" placeholder="?? ?? ?" />
                 </div>
                 <div>
-                  <label for="classFilter">반</label>
-                  <select id="classFilter"><option value="">전체</option></select>
+                  <label for="classFilter">?</label>
+                  <select id="classFilter"><option value="">??</option></select>
                 </div>
                 <div>
-                  <label for="completionFilter">상태</label>
+                  <label for="completionFilter">??</label>
                   <select id="completionFilter">
-                    <option value="all">전체</option>
-                    <option value="dirty">저장 필요</option>
-                    <option value="incomplete">미입력</option>
-                    <option value="complete">입력완료</option>
+                    <option value="all">??</option>
+                    <option value="dirty">?? ??</option>
+                    <option value="incomplete">???</option>
+                    <option value="complete">?? ??</option>
                   </select>
                 </div>
                 <div>
-                  <label for="pageSize">표시</label>
-                  <select id="pageSize">
-                    <option value="10">10명</option>
-                    <option value="20" selected>20명</option>
-                    <option value="50">50명</option>
-                  </select>
+                  <label>?? ??</label>
+                  <div class="notice" style="padding:10px;">???? ?? ?? ?? ?? ???? ?????.</div>
                 </div>
               </div>
 
               <div id="bulkTools" class="no-print"></div>
               <div id="studentsContainer"></div>
               <div class="actions no-print" style="justify-content:center; margin-top:14px;">
-                <button id="prevPageBtn" type="button">← 이전</button>
+                <button id="prevPageBtn" type="button">?? ???</button>
                 <span class="badge" id="pageInfo">1 / 1</span>
-                <button id="nextPageBtn" type="button">다음 →</button>
+                <button id="nextPageBtn" type="button">?? ???</button>
               </div>
             </section>
 
             <aside class="preview-wrap">
               <div class="preview-header">
-                <h2>📝 상담문 미리보기</h2>
+                <h2>??? ????</h2>
                 <div class="actions no-print">
-                  <button class="small primary" id="copyCurrentBtn" type="button">현재 복사</button>
-                  <button class="small" id="copyAllBtn" type="button">전체 복사</button>
+                  <button class="small primary" id="copyCurrentBtn" type="button">?? ?? ??</button>
+                  <button class="small" id="copyAllBtn" type="button">?? ??</button>
                 </div>
               </div>
               <select id="previewStudentSelect" class="no-print" style="margin-bottom:10px;"></select>
@@ -816,14 +923,24 @@
           </div>
         </div>
       </main>
+
+      <aside class="progress-sidebar no-print">
+        <div class="side-section" open>
+          <summary>?? ??</summary>
+          <div class="side-body">
+            <div id="progressSummary" class="help">??? ????.</div>
+            <div id="progressList" class="progress-list"></div>
+          </div>
+        </div>
+      </aside>
     </div>
   </div>
 
   <div class="modal-backdrop no-print" id="localProjectsModal">
     <div class="modal">
       <header>
-        <h3>로컬 저장 프로젝트 목록</h3>
-        <button class="ghost" id="closeLocalProjectsBtn" type="button">닫기</button>
+        <h3>?? ?? ???? ??</h3>
+        <button class="ghost" id="closeLocalProjectsBtn" type="button">??</button>
       </header>
       <main>
         <div id="localProjectsList" class="local-list"></div>
@@ -833,1597 +950,7 @@
 
   <div class="toast" id="toast"></div>
 
-  <script type="module">
-    /*****************************************************************
-     * Firebase 설정
-     * 실제 Firebase 콘솔에서 받은 값을 아래에 붙여 넣으세요.
-     * 값이 비어 있으면 Firebase 미설정 모드로 동작합니다.
-     *****************************************************************/
-    const firebaseConfig = {
-      apiKey: "AIzaSyCzwqK-ylC2Rbi57z9p9owWSbzeYOBm8Yk",
-      authDomain: "cols-doc-maker.firebaseapp.com",
-      projectId: "cols-doc-maker",
-      storageBucket: "cols-doc-maker.firebasestorage.app",
-      messagingSenderId: "824934533685",
-      appId: "1:824934533685:web:8b14f84290274912f2ff7c",
-      measurementId: "G-C4EQTBKDP8"
-    };
-
-    let firebaseApp = null;
-    let db = null;
-    let auth = null;
-    let firebaseReady = false;
-    let currentUser = null;
-    let fb = {};
-
-    const FIELD_LABELS = {
-      roster: "학생/반 목록",
-      scores: "성적 TSV",
-      attitude: "수업태도",
-      bookHomework: "북숙제",
-      readi: "READi",
-      alex: "ALEX",
-      vocabTest: "단어시험",
-      score: "성적 분석",
-      lowScoreCare: "저득점 관리",
-      specialNote: "특이사항",
-      springSchedule: "봄학기 일정",
-      summary: "전체 진행표"
-    };
-
-    const INCLUDE_FIELD_DEFS = [
-      ["attitude", "수업태도"],
-      ["bookHomework", "북숙제"],
-      ["readi", "READi"],
-      ["alex", "ALEX"],
-      ["vocabTest", "단어시험"],
-      ["score", "성적 분석"],
-      ["lowScoreCare", "저득점 관리"],
-      ["specialNote", "특이사항"],
-      ["springSchedule", "봄학기 일정"],
-      ["summerSpecial", "여름특강"],
-      ["registration", "등록 안내"]
-    ];
-
-    const RATING_OPTIONS = ["", "우수", "양호", "보통", "미흡", "미제출", "해당 없음"];
-
-    const state = {
-      activeCriterion: "roster",
-      currentPage: 0,
-      search: "",
-      classFilter: "",
-      completionFilter: "all",
-      selectedStudentId: ""
-    };
-
-    let project = createDefaultProject();
-
-    function createDefaultProject() {
-      const now = new Date().toISOString();
-      return {
-        version: 2,
-        projectName: "2026 SP 3차 MT2 상담",
-        createdAt: now,
-        updatedAt: now,
-        settings: {
-          teacherName: "",
-          year: "26",
-          semester: "SP",
-          consultationType: "3차정기",
-          testType: "MT2",
-          customTitle: "",
-          pageSize: 20,
-          includeFields: {
-            attitude: true,
-            bookHomework: true,
-            readi: true,
-            alex: true,
-            vocabTest: true,
-            score: true,
-            lowScoreCare: true,
-            specialNote: true,
-            springSchedule: true,
-            summerSpecial: false,
-            registration: false
-          },
-          extraFields: [],
-          extraSchedules: [],
-          schedule: {
-            "3D": {
-              termTest: "5/6(수)",
-              eopAlexAward: "5/26(화)",
-              marketDay: "5/22(금)",
-              summerStart: "6/1(월)"
-            },
-            "2D": {
-              termTest: "5/7(목)",
-              eopAlexAward: "5/27(수)",
-              marketDay: "5/21(목)",
-              summerStart: "6/2(화)"
-            }
-          }
-        },
-        students: [],
-        sync: {
-          projectId: "",
-          settingsDirty: false,
-          dirtyStudentIds: {},
-          hasUnsavedChanges: false,
-          lastServerSavedAt: "",
-          lastServerLoadedAt: "",
-          firebaseEnabled: false
-        }
-      };
-    }
-
-    const $ = (id) => document.getElementById(id);
-
-    function safeParseJson(text, fallback = null) {
-      try { return JSON.parse(text); } catch { return fallback; }
-    }
-
-    function showToast(message) {
-      const el = $("toast");
-      el.textContent = message;
-      el.classList.add("show");
-      window.clearTimeout(showToast._timer);
-      showToast._timer = window.setTimeout(() => el.classList.remove("show"), 2300);
-    }
-
-    function debounce(fn, wait = 150) {
-      let timer;
-      return (...args) => {
-        window.clearTimeout(timer);
-        timer = window.setTimeout(() => fn(...args), wait);
-      };
-    }
-
-    function makeSafeId(value) {
-      return String(value || "")
-        .trim()
-        .replace(/\s+/g, "_")
-        .replace(/[\/.]/g, "");
-    }
-
-    function makeProjectId(targetProject = project) {
-      const s = targetProject.settings || {};
-      return [
-        makeSafeId(s.teacherName || "unknown"),
-        makeSafeId(s.year || "year"),
-        makeSafeId(s.semester || "semester"),
-        makeSafeId(s.testType || "test"),
-        makeSafeId(s.consultationType || "consultation")
-      ].join("__");
-    }
-
-    function makeAutoProjectName() {
-      const s = project.settings;
-      return `${s.year || ""} ${s.semester || ""} ${displayConsultationType(s.consultationType)} ${s.testType || ""} 상담`.replace(/\s+/g, " ").trim();
-    }
-
-    function displayConsultationType(value) {
-      const map = {
-        "1차정기": "1차",
-        "2차정기": "2차",
-        "3차정기": "3차",
-        "4차정기": "4차",
-        "특별상담": "특별",
-        "보충상담": "보충"
-      };
-      return map[value] || value || "";
-    }
-
-    function getLocalStorageKey() {
-      return `consultationProject__${makeProjectId(project)}`;
-    }
-
-    function normalizeProjectShape(raw) {
-      const base = createDefaultProject();
-      const merged = {
-        ...base,
-        ...raw,
-        settings: {
-          ...base.settings,
-          ...(raw?.settings || {}),
-          includeFields: {
-            ...base.settings.includeFields,
-            ...(raw?.settings?.includeFields || {})
-          },
-          schedule: {
-            ...base.settings.schedule,
-            ...(raw?.settings?.schedule || {}),
-            "2D": {
-              ...base.settings.schedule["2D"],
-              ...(raw?.settings?.schedule?.["2D"] || {})
-            },
-            "3D": {
-              ...base.settings.schedule["3D"],
-              ...(raw?.settings?.schedule?.["3D"] || {})
-            }
-          },
-          extraFields: raw?.settings?.extraFields || [],
-          extraSchedules: raw?.settings?.extraSchedules || []
-        },
-        sync: {
-          ...base.sync,
-          ...(raw?.sync || {}),
-          dirtyStudentIds: raw?.sync?.dirtyStudentIds || {}
-        },
-        students: Array.isArray(raw?.students) ? raw.students : []
-      };
-      merged.version = 2;
-      merged.students = merged.students.map((student, index) => normalizeStudent(student, index));
-      merged.projectName = merged.projectName || makeAutoProjectNameFromSettings(merged.settings);
-      return merged;
-    }
-
-    function makeAutoProjectNameFromSettings(settings) {
-      const label = displayConsultationType(settings?.consultationType || "");
-      return `${settings?.year || ""} ${settings?.semester || ""} ${label} ${settings?.testType || ""} 상담`.replace(/\s+/g, " ").trim();
-    }
-
-    function normalizeStudent(raw, index = 0) {
-      const name = String(raw?.name || "").trim();
-      const className = String(raw?.className || raw?.class || "").trim();
-      const classType = raw?.classType || detectClassType(className);
-      const id = raw?.id || makeStudentId(className, name, index);
-      return {
-        id,
-        className,
-        name,
-        classType,
-        attitude: raw?.attitude || "",
-        bookHomework: {
-          rating: raw?.bookHomework?.rating || "",
-          memo: raw?.bookHomework?.memo || ""
-        },
-        readi: {
-          rating: raw?.readi?.rating || "",
-          memo: raw?.readi?.memo || ""
-        },
-        alex: {
-          rating: raw?.alex?.rating || "",
-          memo: raw?.alex?.memo || ""
-        },
-        vocabTest: raw?.vocabTest || "",
-        scores: raw?.scores || {},
-        lowScoreCare: raw?.lowScoreCare || "",
-        extraFieldValues: raw?.extraFieldValues || {},
-        specialNote: raw?.specialNote || "",
-        _dirty: Boolean(raw?._dirty),
-        _lastSavedAt: raw?._lastSavedAt || ""
-      };
-    }
-
-    function detectClassType(className) {
-      const text = String(className || "").toUpperCase();
-      if (/\b3D\b|3D|월수금|MWF|MON|WED|FRI/.test(text)) return "3D";
-      if (/\b2D\b|2D|화목|TTH|TUE|THU/.test(text)) return "2D";
-      return "2D";
-    }
-
-    function makeStudentId(className, name, index) {
-      return `${makeSafeId(className || "class")}__${makeSafeId(name || "student")}__${index}`;
-    }
-
-    function getScore(student) {
-      const testType = project.settings.testType || "MT2";
-      if (!student.scores) student.scores = {};
-      if (!student.scores[testType]) {
-        student.scores[testType] = { lc: "", rc: "", vo: "", gr: "", total: "", good: "", problem: "", improvement: "" };
-      }
-      return student.scores[testType];
-    }
-
-    function setLocalStatus(message) {
-      const el = $("localSaveStatus");
-      if (el) el.textContent = message;
-    }
-
-    function setServerStatus(message) {
-      const el = $("serverSaveStatus");
-      if (el) el.textContent = message;
-    }
-
-    function renderDirtyCount() {
-      const count = Object.keys(project.sync.dirtyStudentIds || {}).length;
-      const text = count > 0 ? `변경된 학생 ${count}명` : "변경된 학생 0명";
-      $("dirtyCount").textContent = text;
-      $("unsavedBadge").textContent = project.sync.hasUnsavedChanges ? "서버 저장 필요" : "서버 저장 완료/미변경";
-      $("unsavedBadge").className = `badge ${project.sync.hasUnsavedChanges ? "warn" : "ok"}`;
-    }
-
-    function renderSaveStatus() {
-      setLocalStatus("로컬 저장됨");
-      if (project.sync.hasUnsavedChanges) {
-        setServerStatus("⚠ 서버 저장 필요");
-      } else if (project.sync.lastServerSavedAt) {
-        const t = project.sync.lastServerSavedAt.slice(0, 19).replace("T", " ");
-        setServerStatus(`✓ 서버 저장 완료 ${t}`);
-      } else if (!firebaseReady) {
-        setServerStatus("Firebase 미설정 / JSON 백업 가능");
-      } else {
-        setServerStatus("서버 미저장");
-      }
-      $("lastSavedAtView").textContent = project.sync.lastServerSavedAt
-        ? project.sync.lastServerSavedAt.slice(0, 19).replace("T", " ")
-        : "-";
-      renderDirtyCount();
-      renderFirebaseBadge();
-    }
-
-    const saveProjectToLocalStorage = debounce(() => {
-      project.updatedAt = new Date().toISOString();
-      project.sync.projectId = makeProjectId(project);
-      localStorage.setItem(getLocalStorageKey(), JSON.stringify(project));
-      setLocalStatus("로컬 저장됨");
-      renderProjectId();
-    }, 80);
-
-    function saveProjectToLocalStorageNow() {
-      project.updatedAt = new Date().toISOString();
-      project.sync.projectId = makeProjectId(project);
-      localStorage.setItem(getLocalStorageKey(), JSON.stringify(project));
-      setLocalStatus("로컬 저장됨");
-      renderProjectId();
-    }
-
-    function markStudentDirty(student) {
-      student._dirty = true;
-      project.sync.dirtyStudentIds[student.id] = true;
-      project.sync.hasUnsavedChanges = true;
-      saveProjectToLocalStorage();
-      renderSaveStatus();
-      renderPreview();
-    }
-
-    function markSettingsDirty({ rerender = true } = {}) {
-      project.sync.settingsDirty = true;
-      project.sync.hasUnsavedChanges = true;
-      saveProjectToLocalStorage();
-      renderSaveStatus();
-      if (rerender) renderAll({ keepPage: true });
-    }
-
-    function renderProjectId() {
-      $("projectIdView").textContent = makeProjectId(project);
-    }
-
-    function bindEvents() {
-      ["teacherName", "year", "semester", "consultationType", "testType", "projectName"].forEach(id => {
-        $(id).addEventListener("input", () => {
-          project.settings.teacherName = $("teacherName").value.trim();
-          project.settings.year = $("year").value.trim();
-          project.settings.semester = $("semester").value;
-          project.settings.consultationType = $("consultationType").value;
-          project.settings.testType = $("testType").value;
-          project.projectName = $("projectName").value.trim() || makeAutoProjectName();
-          markSettingsDirty({ rerender: id === "testType" });
-          renderProjectId();
-        });
-        $(id).addEventListener("change", () => {
-          project.settings.teacherName = $("teacherName").value.trim();
-          project.settings.year = $("year").value.trim();
-          project.settings.semester = $("semester").value;
-          project.settings.consultationType = $("consultationType").value;
-          project.settings.testType = $("testType").value;
-          project.projectName = $("projectName").value.trim() || makeAutoProjectName();
-          markSettingsDirty({ rerender: id === "testType" });
-          renderProjectId();
-        });
-      });
-
-      $("pageSize").addEventListener("change", () => {
-        project.settings.pageSize = Number($("pageSize").value) || 20;
-        state.currentPage = 0;
-        markSettingsDirty();
-      });
-      $("searchInput").addEventListener("input", () => {
-        state.search = $("searchInput").value.trim();
-        state.currentPage = 0;
-        renderStudents();
-        renderPreviewStudentSelect();
-      });
-      $("classFilter").addEventListener("change", () => {
-        state.classFilter = $("classFilter").value;
-        state.currentPage = 0;
-        renderStudents();
-        renderPreviewStudentSelect();
-      });
-      $("completionFilter").addEventListener("change", () => {
-        state.completionFilter = $("completionFilter").value;
-        state.currentPage = 0;
-        renderStudents();
-      });
-      $("prevPageBtn").addEventListener("click", () => {
-        state.currentPage = Math.max(0, state.currentPage - 1);
-        renderStudents();
-      });
-      $("nextPageBtn").addEventListener("click", () => {
-        const totalPages = getTotalPages();
-        state.currentPage = Math.min(totalPages - 1, state.currentPage + 1);
-        renderStudents();
-      });
-      $("previewStudentSelect").addEventListener("change", () => {
-        state.selectedStudentId = $("previewStudentSelect").value;
-        renderPreview();
-      });
-      $("copyCurrentBtn").addEventListener("click", copyCurrentConsultationText);
-      $("copyAllBtn").addEventListener("click", copyAllConsultationTexts);
-      $("saveJsonBtn").addEventListener("click", saveProjectAsJSON);
-      $("loadJsonBtn").addEventListener("click", () => $("jsonFileInput").click());
-      $("jsonFileInput").addEventListener("change", loadProjectFromJSONFile);
-      $("saveServerBtn").addEventListener("click", saveProjectToFirebase);
-      $("loadServerBtn").addEventListener("click", loadProjectFromFirebase);
-      $("newProjectBtn").addEventListener("click", createNewProject);
-      $("addExtraFieldBtn").addEventListener("click", addExtraField);
-      $("showLocalProjectsBtn").addEventListener("click", showLocalProjectsModal);
-      $("closeLocalProjectsBtn").addEventListener("click", () => $("localProjectsModal").classList.remove("show"));
-      $("localProjectsModal").addEventListener("click", (event) => {
-        if (event.target.id === "localProjectsModal") $("localProjectsModal").classList.remove("show");
-      });
-      $("loginBtn").addEventListener("click", loginWithEmail);
-      $("logoutBtn").addEventListener("click", logout);
-
-      // Enter 키로 로그인 제출 (이메일/비밀번호 어느 쪽에서든)
-      ["authEmail", "authPassword"].forEach(id => {
-        $(id).addEventListener("keydown", (e) => {
-          if (e.key === "Enter") {
-            e.preventDefault();
-            loginWithEmail();
-          }
-        });
-      });
-
-      // "더보기 ▾" 드롭다운 토글
-      const moreBtn = $("moreBtn");
-      const moreMenu = $("moreMenu");
-      moreBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const isOpen = moreMenu.classList.toggle("show");
-        moreBtn.setAttribute("aria-expanded", String(isOpen));
-      });
-      moreMenu.addEventListener("click", (e) => {
-        // 메뉴 안에서 버튼을 눌렀을 때 메뉴 닫기
-        if (e.target.closest("button")) {
-          moreMenu.classList.remove("show");
-          moreBtn.setAttribute("aria-expanded", "false");
-        }
-      });
-      document.addEventListener("click", (e) => {
-        if (!moreMenu.contains(e.target) && e.target !== moreBtn) {
-          moreMenu.classList.remove("show");
-          moreBtn.setAttribute("aria-expanded", "false");
-        }
-      });
-      document.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") {
-          moreMenu.classList.remove("show");
-          moreBtn.setAttribute("aria-expanded", "false");
-          $("localProjectsModal").classList.remove("show");
-        }
-      });
-
-      document.addEventListener("keydown", (event) => {
-        if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "s") {
-          event.preventDefault();
-          saveProjectToFirebase();
-        }
-      });
-
-      window.addEventListener("beforeunload", (event) => {
-        if (project.sync?.hasUnsavedChanges) {
-          event.preventDefault();
-          event.returnValue = "";
-        }
-      });
-    }
-
-    function renderAll({ keepPage = false } = {}) {
-      if (!keepPage) state.currentPage = 0;
-      renderSettingsInputs();
-      renderProjectId();
-      renderIncludeFields();
-      renderScheduleInputs();
-      renderExtraFieldsList();
-      renderTabs();
-      renderClassFilter();
-      renderBulkTools();
-      renderStudents();
-      renderPreviewStudentSelect();
-      renderPreview();
-      renderSaveStatus();
-      $("studentCountBadge").textContent = `학생 ${project.students.length}명`;
-    }
-
-    function renderSettingsInputs() {
-      $("teacherName").value = project.settings.teacherName || "";
-      $("year").value = project.settings.year || "26";
-      $("semester").value = project.settings.semester || "SP";
-      $("consultationType").value = project.settings.consultationType || "3차정기";
-      $("testType").value = project.settings.testType || "MT2";
-      $("projectName").value = project.projectName || makeAutoProjectName();
-      $("pageSize").value = String(project.settings.pageSize || 20);
-      $("searchInput").value = state.search;
-      $("completionFilter").value = state.completionFilter;
-    }
-
-    function renderIncludeFields() {
-      const container = $("includeFields");
-      container.innerHTML = "";
-      INCLUDE_FIELD_DEFS.forEach(([key, label]) => {
-        const item = document.createElement("label");
-        item.className = "check-item";
-        item.innerHTML = `<input type="checkbox" data-field="${key}"> <span>${label}</span>`;
-        const input = item.querySelector("input");
-        input.checked = Boolean(project.settings.includeFields[key]);
-        input.addEventListener("change", () => {
-          project.settings.includeFields[key] = input.checked;
-          markSettingsDirty();
-        });
-        container.appendChild(item);
-      });
-    }
-
-    function renderScheduleInputs() {
-      const schedule = project.settings.schedule;
-      const map = [
-        ["schedule3DTermTest", "3D", "termTest"],
-        ["schedule3DEopAlexAward", "3D", "eopAlexAward"],
-        ["schedule3DMarketDay", "3D", "marketDay"],
-        ["schedule3DSummerStart", "3D", "summerStart"],
-        ["schedule2DTermTest", "2D", "termTest"],
-        ["schedule2DEopAlexAward", "2D", "eopAlexAward"],
-        ["schedule2DMarketDay", "2D", "marketDay"],
-        ["schedule2DSummerStart", "2D", "summerStart"]
-      ];
-      map.forEach(([id, type, key]) => {
-        const el = $(id);
-        el.value = schedule?.[type]?.[key] || "";
-        el.oninput = () => {
-          if (!project.settings.schedule[type]) project.settings.schedule[type] = {};
-          project.settings.schedule[type][key] = el.value.trim();
-          markSettingsDirty({ rerender: false });
-          renderPreview();
-        };
-      });
-    }
-
-    function renderTabs() {
-      const baseTabs = ["roster", "scores", "attitude", "bookHomework", "readi", "alex", "vocabTest", "score", "lowScoreCare", "specialNote", "springSchedule"];
-      const tabs = baseTabs.filter(key => key === "roster" || key === "scores" || project.settings.includeFields[key]);
-      project.settings.extraFields.forEach(field => tabs.push(`extra:${field.id}`));
-      tabs.push("summary");
-
-      if (!tabs.includes(state.activeCriterion)) state.activeCriterion = tabs[0] || "roster";
-
-      const container = $("criterionTabs");
-      container.innerHTML = "";
-      tabs.forEach(key => {
-        const btn = document.createElement("button");
-        btn.type = "button";
-        btn.className = `tab ${state.activeCriterion === key ? "active" : ""}`;
-        btn.textContent = getTabLabel(key);
-        btn.addEventListener("click", () => {
-          state.activeCriterion = key;
-          state.currentPage = 0;
-          renderTabs();
-          renderBulkTools();
-          renderStudents();
-        });
-        container.appendChild(btn);
-      });
-    }
-
-    function getTabLabel(key) {
-      if (key.startsWith("extra:")) {
-        const id = key.slice(6);
-        return project.settings.extraFields.find(f => f.id === id)?.name || "추가항목";
-      }
-      return FIELD_LABELS[key] || key;
-    }
-
-    function renderClassFilter() {
-      const select = $("classFilter");
-      const classes = Array.from(new Set(project.students.map(s => s.className).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
-      select.innerHTML = `<option value="">전체 반</option>` + classes.map(c => `<option value="${escapeHtml(c)}">${escapeHtml(c)}</option>`).join("");
-      select.value = state.classFilter;
-    }
-
-    function renderExtraFieldsList() {
-      const container = $("extraFieldsList");
-      if (project.settings.extraFields.length === 0) {
-        container.innerHTML = `<div class="help">추가된 자유 항목이 없습니다.</div>`;
-        return;
-      }
-      container.innerHTML = `<table class="mini-table"><thead><tr><th>항목명</th><th style="width:80px;">관리</th></tr></thead><tbody></tbody></table>`;
-      const tbody = container.querySelector("tbody");
-      project.settings.extraFields.forEach(field => {
-        const tr = document.createElement("tr");
-        tr.innerHTML = `<td>${escapeHtml(field.name)}</td><td><button class="small danger" type="button">삭제</button></td>`;
-        tr.querySelector("button").addEventListener("click", () => removeExtraField(field.id));
-        tbody.appendChild(tr);
-      });
-    }
-
-    function addExtraField() {
-      const input = $("extraFieldName");
-      const name = input.value.trim();
-      if (!name) {
-        alert("추가할 항목명을 입력해주세요.");
-        return;
-      }
-      const field = { id: `extra_${Date.now()}`, name };
-      project.settings.extraFields.push(field);
-      project.students.forEach(student => {
-        if (!student.extraFieldValues) student.extraFieldValues = {};
-        student.extraFieldValues[field.id] = "";
-      });
-      input.value = "";
-      markSettingsDirty();
-      renderAll({ keepPage: true });
-    }
-
-    function removeExtraField(fieldId) {
-      const field = project.settings.extraFields.find(f => f.id === fieldId);
-      if (!field) return;
-      const ok = confirm(`'${field.name}' 항목을 삭제하시겠습니까? 학생별 입력값도 함께 제거됩니다.`);
-      if (!ok) return;
-      project.settings.extraFields = project.settings.extraFields.filter(f => f.id !== fieldId);
-      project.students.forEach(student => {
-        if (student.extraFieldValues) delete student.extraFieldValues[fieldId];
-        markStudentDirty(student);
-      });
-      markSettingsDirty();
-      if (state.activeCriterion === `extra:${fieldId}`) state.activeCriterion = "attitude";
-      renderAll({ keepPage: true });
-    }
-
-    function renderBulkTools() {
-      const container = $("bulkTools");
-      if (state.activeCriterion === "roster") {
-        container.innerHTML = `
-          <div class="student-card">
-            <div class="section-title">학생/반 목록 TSV 붙여넣기</div>
-            <div class="help">권장 형식: <span class="mono">반\t이름</span>. 헤더가 있어도 자동으로 무시합니다. 반명 안에 2D/3D 또는 화목/월수금이 있으면 classType을 자동 인식합니다.</div>
-            <textarea id="rosterTsv" placeholder="Octa 1 2D 2부-3\t김도형&#10;Octa 1 2D 2부-3\t박서연"></textarea>
-            <div class="actions" style="margin-top:10px;">
-              <button id="applyRosterBtn" class="primary" type="button">학생 목록 반영</button>
-              <button id="appendRosterBtn" type="button">기존 목록에 추가</button>
-            </div>
-          </div>`;
-        $("applyRosterBtn").addEventListener("click", () => applyRosterFromTextarea(false));
-        $("appendRosterBtn").addEventListener("click", () => applyRosterFromTextarea(true));
-      } else if (state.activeCriterion === "scores") {
-        container.innerHTML = `
-          <div class="student-card">
-            <div class="section-title">성적 TSV 붙여넣기</div>
-            <div class="help">헤더 권장: <span class="mono">이름\tLC\tRC\tVO\tGR\tTotal\tGood\tProblem\tImprovement\tVocab</span>. 이름 또는 반+이름으로 매칭합니다.</div>
-            <textarea id="scoreTsv" placeholder="이름\tLC\tRC\tVO\tGR\tTotal\tGood\tProblem\tImprovement\tVocab&#10;김도형\t-2\t-7\t-4\t-2\t70\tListening 양호\tRC 보완\t문제를 꼼꼼히 읽기\t68.00%"></textarea>
-            <div class="actions" style="margin-top:10px;">
-              <button id="applyScoresBtn" class="primary" type="button">성적 반영</button>
-            </div>
-          </div>`;
-        $("applyScoresBtn").addEventListener("click", applyScoresFromTextarea);
-      } else if (state.activeCriterion === "summary") {
-        container.innerHTML = "";
-      } else {
-        container.innerHTML = "";
-      }
-    }
-
-    function applyRosterFromTextarea(append) {
-      const text = $("rosterTsv")?.value || "";
-      const rows = parseTsv(text).filter(row => row.some(cell => cell.trim()));
-      if (rows.length === 0) {
-        alert("붙여넣은 학생 목록이 없습니다.");
-        return;
-      }
-      const parsed = [];
-      rows.forEach((row) => {
-        const joined = row.join(" ").toLowerCase();
-        if (/^(반|class|classname|학생|이름|name)\b/.test(joined.replace(/\s+/g, ""))) return;
-        const compact = row.map(c => c.trim()).filter(Boolean);
-        if (compact.length < 2) return;
-        let className = compact[0];
-        let name = compact[1];
-        if (compact.length >= 3 && /이름|name/i.test(compact[0])) {
-          name = compact[0];
-          className = compact[1];
-        }
-        parsed.push({ className, name });
-      });
-      if (parsed.length === 0) {
-        alert("반/이름 형식의 데이터를 찾지 못했습니다.");
-        return;
-      }
-
-      const oldByKey = new Map(project.students.map(s => [`${s.className}__${s.name}`, s]));
-      const newStudents = parsed.map((row, index) => {
-        const existing = oldByKey.get(`${row.className}__${row.name}`);
-        if (existing) return normalizeStudent(existing, index);
-        const student = normalizeStudent({ className: row.className, name: row.name }, index);
-        student._dirty = true;
-        return student;
-      });
-
-      if (append) {
-        const existingKeys = new Set(project.students.map(s => `${s.className}__${s.name}`));
-        newStudents.forEach(student => {
-          const key = `${student.className}__${student.name}`;
-          if (!existingKeys.has(key)) project.students.push(student);
-        });
-      } else {
-        project.students = newStudents;
-      }
-      project.students = project.students.map((student, index) => {
-        if (!student.id || /__\d+$/.test(student.id) === false) student.id = makeStudentId(student.className, student.name, index);
-        return normalizeStudent(student, index);
-      });
-      project.students.forEach(student => {
-        if (student._dirty) project.sync.dirtyStudentIds[student.id] = true;
-      });
-      project.sync.settingsDirty = true;
-      project.sync.hasUnsavedChanges = true;
-      if (!state.selectedStudentId && project.students[0]) state.selectedStudentId = project.students[0].id;
-      saveProjectToLocalStorageNow();
-      renderAll();
-      showToast(`${parsed.length}명 목록을 반영했습니다.`);
-    }
-
-    function applyScoresFromTextarea() {
-      const text = $("scoreTsv")?.value || "";
-      const rows = parseTsv(text).filter(row => row.some(cell => cell.trim()));
-      if (rows.length === 0) {
-        alert("붙여넣은 성적 데이터가 없습니다.");
-        return;
-      }
-      const header = rows[0].map(normalizeHeader);
-      const hasHeader = header.some(h => ["name", "className", "lc", "rc", "vo", "gr", "total", "good", "problem", "improvement", "vocabTest"].includes(h));
-      const dataRows = hasHeader ? rows.slice(1) : rows;
-      const columns = hasHeader ? header : ["name", "lc", "rc", "vo", "gr", "total", "good", "problem", "improvement", "vocabTest"];
-      let matched = 0;
-      let missed = 0;
-      dataRows.forEach(row => {
-        const obj = {};
-        columns.forEach((key, i) => { if (key) obj[key] = row[i] ?? ""; });
-        const name = String(obj.name || row[0] || "").trim();
-        const className = String(obj.className || "").trim();
-        if (!name) return;
-        const candidates = project.students.filter(s => s.name === name);
-        const student = className ? candidates.find(s => s.className === className) : candidates[0];
-        if (!student) { missed++; return; }
-        const score = getScore(student);
-        ["lc", "rc", "vo", "gr", "total", "good", "problem", "improvement"].forEach(key => {
-          if (obj[key] !== undefined) score[key] = String(obj[key] || "").trim();
-        });
-        if (obj.vocabTest !== undefined) student.vocabTest = String(obj.vocabTest || "").trim();
-        markStudentDirty(student);
-        matched++;
-      });
-      saveProjectToLocalStorageNow();
-      renderAll({ keepPage: true });
-      showToast(`성적 반영 완료: 매칭 ${matched}명, 미매칭 ${missed}명`);
-    }
-
-    function normalizeHeader(value) {
-      const h = String(value || "").trim().toLowerCase().replace(/\s+/g, "");
-      const map = {
-        "이름": "name", "학생": "name", "student": "name", "name": "name",
-        "반": "className", "classname": "className", "class": "className", "class_name": "className",
-        "lc": "lc", "listening": "lc", "리스닝": "lc",
-        "rc": "rc", "reading": "rc", "리딩": "rc",
-        "vo": "vo", "voca": "vo", "vocab": "vo", "vocabulary": "vo", "단어": "vo",
-        "gr": "gr", "grammar": "gr", "문법": "gr",
-        "total": "total", "총점": "total", "점수": "total",
-        "good": "good", "잘한점": "good", "강점": "good",
-        "problem": "problem", "문제점": "problem", "보완점": "problem",
-        "improvement": "improvement", "개선": "improvement", "개선방향": "improvement", "지도방향": "improvement",
-        "vocabtest": "vocabTest", "단어시험": "vocabTest", "단어성적": "vocabTest"
-      };
-      return map[h] || h;
-    }
-
-    function parseTsv(text) {
-      return String(text || "")
-        .replace(/\r\n/g, "\n")
-        .replace(/\r/g, "\n")
-        .split("\n")
-        .map(line => line.split("\t").map(cell => cell.trim()));
-    }
-
-    function getFilteredStudents() {
-      const search = state.search.toLowerCase();
-      return project.students.filter(student => {
-        if (state.classFilter && student.className !== state.classFilter) return false;
-        if (search && !`${student.name} ${student.className}`.toLowerCase().includes(search)) return false;
-        if (state.completionFilter === "dirty" && !student._dirty) return false;
-        if (state.completionFilter === "complete" && !isCriterionComplete(student, state.activeCriterion)) return false;
-        if (state.completionFilter === "incomplete" && isCriterionComplete(student, state.activeCriterion)) return false;
-        return true;
-      });
-    }
-
-    function getTotalPages() {
-      const count = getFilteredStudents().length;
-      const pageSize = project.settings.pageSize || 20;
-      return Math.max(1, Math.ceil(count / pageSize));
-    }
-
-    function renderStudents() {
-      const container = $("studentsContainer");
-      const filtered = getFilteredStudents();
-      const pageSize = project.settings.pageSize || 20;
-      const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-      if (state.currentPage >= totalPages) state.currentPage = totalPages - 1;
-      const start = state.currentPage * pageSize;
-      const pageStudents = filtered.slice(start, start + pageSize);
-      $("pageInfo").textContent = `${state.currentPage + 1} / ${totalPages} · ${filtered.length}명`;
-      $("prevPageBtn").disabled = state.currentPage <= 0;
-      $("nextPageBtn").disabled = state.currentPage >= totalPages - 1;
-
-      if (state.activeCriterion === "summary") {
-        renderSummary(container, filtered);
-        return;
-      }
-
-      if (state.activeCriterion === "roster" && project.students.length === 0) {
-        container.innerHTML = `<div class="empty-state">학생/반 목록 TSV를 붙여넣고 [학생 목록 반영]을 눌러주세요.</div>`;
-        return;
-      }
-      if (pageStudents.length === 0) {
-        container.innerHTML = `<div class="empty-state">조건에 맞는 학생이 없습니다.</div>`;
-        return;
-      }
-      container.innerHTML = "";
-      pageStudents.forEach(student => container.appendChild(renderStudentCard(student)));
-    }
-
-    function renderSummary(container, students) {
-      const rows = students.map(student => {
-        const score = getScore(student);
-        const completion = getCompletionCount(student);
-        return `<tr>
-          <td><strong>${escapeHtml(student.name)}</strong><div class="student-meta">${escapeHtml(student.className)} · ${escapeHtml(student.classType)}</div></td>
-          <td>${student._dirty ? "⚠ 저장 필요" : "✓"}</td>
-          <td>${completion.done}/${completion.total}</td>
-          <td>${escapeHtml(score.total || "")}</td>
-          <td>${escapeHtml(student.vocabTest || "")}</td>
-          <td>${escapeHtml(student.specialNote || "")}</td>
-        </tr>`;
-      }).join("");
-      container.innerHTML = `
-        <div class="student-card">
-          <div class="section-title">전체 진행표</div>
-          <table class="mini-table">
-            <thead><tr><th>학생</th><th>저장</th><th>입력</th><th>총점</th><th>단어</th><th>특이사항</th></tr></thead>
-            <tbody>${rows || `<tr><td colspan="6">학생이 없습니다.</td></tr>`}</tbody>
-          </table>
-        </div>`;
-    }
-
-    function renderStudentCard(student) {
-      const card = document.createElement("div");
-      card.className = "student-card";
-      card.dataset.studentId = student.id;
-      const status = student._dirty ? `<span class="dirty-dot">● 서버 저장 필요</span>` : `<span class="saved-dot">✓ 미변경</span>`;
-      card.innerHTML = `
-        <div class="student-head">
-          <div>
-            <div class="student-name">${escapeHtml(student.name)}</div>
-            <div class="student-meta">${escapeHtml(student.className)} · ${escapeHtml(student.classType)} · ${escapeHtml(student.id)}</div>
-          </div>
-          <div class="actions">${status}<button class="small ghost select-preview" type="button">미리보기 선택</button></div>
-        </div>
-        <div class="student-inputs"></div>`;
-      card.querySelector(".select-preview").addEventListener("click", () => {
-        state.selectedStudentId = student.id;
-        renderPreviewStudentSelect();
-        renderPreview();
-      });
-      const inputs = card.querySelector(".student-inputs");
-      inputs.appendChild(renderCriterionInputs(student, state.activeCriterion));
-      return card;
-    }
-
-    function renderCriterionInputs(student, criterion) {
-      const wrap = document.createElement("div");
-      if (criterion === "roster") {
-        wrap.appendChild(makeInputRow("반", makeBoundInput(student, "className", student.className, value => {
-          student.className = value;
-          student.classType = detectClassType(value);
-          markStudentDirty(student);
-          renderClassFilter();
-        })));
-        wrap.appendChild(makeInputRow("이름", makeBoundInput(student, "name", student.name, value => {
-          student.name = value;
-          markStudentDirty(student);
-          renderPreviewStudentSelect();
-        })));
-        wrap.appendChild(makeInputRow("2D/3D", makeBoundSelect(student.classType, ["2D", "3D"], value => {
-          student.classType = value;
-          markStudentDirty(student);
-        })));
-      } else if (criterion === "scores") {
-        wrap.appendChild(renderScoreInputs(student));
-      } else if (["bookHomework", "readi", "alex"].includes(criterion)) {
-        const obj = student[criterion] || { rating: "", memo: "" };
-        student[criterion] = obj;
-        wrap.appendChild(makeInputRow("평가", makeBoundSelect(obj.rating, RATING_OPTIONS, value => {
-          obj.rating = value;
-          markStudentDirty(student);
-        })));
-        wrap.appendChild(makeInputRow("메모", makeBoundTextarea(obj.memo, value => {
-          obj.memo = value;
-          markStudentDirty(student);
-        })));
-      } else if (criterion === "attitude") {
-        wrap.appendChild(makeInputRow("수업태도", makeBoundTextarea(student.attitude, value => {
-          student.attitude = value;
-          markStudentDirty(student);
-        })));
-      } else if (criterion === "vocabTest") {
-        wrap.appendChild(makeInputRow("단어시험", makeBoundInput(student, "vocabTest", student.vocabTest, value => {
-          student.vocabTest = value;
-          markStudentDirty(student);
-        }, "예: 68.00% / 재시 통과 / 미응시")));
-      } else if (criterion === "score") {
-        wrap.appendChild(renderScoreInputs(student));
-      } else if (criterion === "lowScoreCare") {
-        wrap.appendChild(makeInputRow("저득점 관리", makeBoundTextarea(student.lowScoreCare, value => {
-          student.lowScoreCare = value;
-          markStudentDirty(student);
-        })));
-      } else if (criterion === "specialNote") {
-        wrap.appendChild(makeInputRow("특이사항", makeBoundTextarea(student.specialNote, value => {
-          student.specialNote = value;
-          markStudentDirty(student);
-        })));
-      } else if (criterion === "springSchedule") {
-        const schedule = project.settings.schedule[student.classType] || {};
-        wrap.innerHTML = `<div class="notice">${escapeHtml(student.classType)} 일정: Term Test ${escapeHtml(schedule.termTest || "-")}, EOP/ALEX Award ${escapeHtml(schedule.eopAlexAward || "-")}, Market Day ${escapeHtml(schedule.marketDay || "-")}, 여름학기 시작 ${escapeHtml(schedule.summerStart || "-")}</div>`;
-      } else if (criterion.startsWith("extra:")) {
-        const fieldId = criterion.slice(6);
-        if (!student.extraFieldValues) student.extraFieldValues = {};
-        wrap.appendChild(makeInputRow("내용", makeBoundTextarea(student.extraFieldValues[fieldId] || "", value => {
-          student.extraFieldValues[fieldId] = value;
-          markStudentDirty(student);
-        })));
-      }
-      return wrap;
-    }
-
-    function renderScoreInputs(student) {
-      const wrap = document.createElement("div");
-      const score = getScore(student);
-      wrap.innerHTML = `<div class="score-grid"></div>`;
-      const grid = wrap.querySelector(".score-grid");
-      [
-        ["lc", "LC"], ["rc", "RC"], ["vo", "VO"], ["gr", "GR"], ["total", "총점"]
-      ].forEach(([key, label]) => {
-        const box = document.createElement("div");
-        box.innerHTML = `<label>${label}</label>`;
-        box.appendChild(makeBoundInput(student, key, score[key] || "", value => {
-          score[key] = value;
-          markStudentDirty(student);
-        }));
-        grid.appendChild(box);
-      });
-      wrap.appendChild(makeInputRow("잘한 점", makeBoundTextarea(score.good || "", value => {
-        score.good = value;
-        markStudentDirty(student);
-      })));
-      wrap.appendChild(makeInputRow("문제점", makeBoundTextarea(score.problem || "", value => {
-        score.problem = value;
-        markStudentDirty(student);
-      })));
-      wrap.appendChild(makeInputRow("개선 방향", makeBoundTextarea(score.improvement || "", value => {
-        score.improvement = value;
-        markStudentDirty(student);
-      })));
-      return wrap;
-    }
-
-    function makeInputRow(labelText, control) {
-      const row = document.createElement("div");
-      row.className = "input-row";
-      const label = document.createElement("label");
-      label.textContent = labelText;
-      row.appendChild(label);
-      row.appendChild(control);
-      return row;
-    }
-
-    function makeBoundInput(student, key, value, onChange, placeholder = "") {
-      const input = document.createElement("input");
-      input.value = value || "";
-      input.placeholder = placeholder;
-      input.addEventListener("input", () => onChange(input.value));
-      return input;
-    }
-
-    function makeBoundTextarea(value, onChange) {
-      const textarea = document.createElement("textarea");
-      textarea.value = value || "";
-      textarea.addEventListener("input", () => onChange(textarea.value));
-      return textarea;
-    }
-
-    function makeBoundSelect(value, options, onChange) {
-      const select = document.createElement("select");
-      select.innerHTML = options.map(opt => `<option value="${escapeHtml(opt)}">${escapeHtml(opt || "선택")}</option>`).join("");
-      select.value = value || "";
-      select.addEventListener("change", () => onChange(select.value));
-      return select;
-    }
-
-    function isCriterionComplete(student, criterion) {
-      if (criterion === "roster") return Boolean(student.className && student.name);
-      if (criterion === "attitude") return Boolean(student.attitude?.trim());
-      if (["bookHomework", "readi", "alex"].includes(criterion)) return Boolean(student[criterion]?.rating || student[criterion]?.memo);
-      if (criterion === "vocabTest") return Boolean(student.vocabTest?.trim());
-      if (criterion === "score" || criterion === "scores") {
-        const score = getScore(student);
-        return ["lc", "rc", "vo", "gr", "total", "good", "problem", "improvement"].some(k => String(score[k] || "").trim());
-      }
-      if (criterion === "lowScoreCare") return Boolean(student.lowScoreCare?.trim());
-      if (criterion === "specialNote") return Boolean(student.specialNote?.trim());
-      if (criterion === "springSchedule") return true;
-      if (criterion.startsWith("extra:")) return Boolean(student.extraFieldValues?.[criterion.slice(6)]?.trim());
-      return true;
-    }
-
-    function getCompletionCount(student) {
-      const keys = ["attitude", "bookHomework", "readi", "alex", "vocabTest", "score", "lowScoreCare", "specialNote"]
-        .filter(k => project.settings.includeFields[k]);
-      project.settings.extraFields.forEach(f => keys.push(`extra:${f.id}`));
-      const done = keys.filter(key => isCriterionComplete(student, key)).length;
-      return { done, total: keys.length };
-    }
-
-    function renderPreviewStudentSelect() {
-      const select = $("previewStudentSelect");
-      const students = getFilteredStudents();
-      if (!state.selectedStudentId || !project.students.some(s => s.id === state.selectedStudentId)) {
-        state.selectedStudentId = students[0]?.id || project.students[0]?.id || "";
-      }
-      select.innerHTML = project.students.map(student => `<option value="${escapeHtml(student.id)}">${escapeHtml(student.className)} · ${escapeHtml(student.name)}</option>`).join("");
-      select.value = state.selectedStudentId;
-    }
-
-    function renderPreview() {
-      const student = project.students.find(s => s.id === state.selectedStudentId) || project.students[0];
-      $("previewBox").textContent = student ? buildConsultationText(student) : "학생을 먼저 입력해주세요.";
-    }
-
-    function buildConsultationText(student) {
-      // 들여쓰기: 서식이 안 먹는 입력란용 — 공백 3칸 사용
-      const INDENT = "   ";
-      const title = project.projectName || makeAutoProjectName();
-      const score = getScore(student);
-
-      // 각 섹션: { title, lines: string[] } — lines는 여러 줄 가능
-      const sections = [];
-
-      if (project.settings.includeFields.attitude && student.attitude) {
-        sections.push({ title: "수업태도", lines: splitMultiline(student.attitude) });
-      }
-      if (project.settings.includeFields.bookHomework && hasRatingMemo(student.bookHomework)) {
-        sections.push({ title: "북숙제", lines: splitMultiline(formatRatingMemo(student.bookHomework)) });
-      }
-      if (project.settings.includeFields.readi && hasRatingMemo(student.readi)) {
-        sections.push({ title: "READi", lines: splitMultiline(formatRatingMemo(student.readi)) });
-      }
-      if (project.settings.includeFields.alex && hasRatingMemo(student.alex)) {
-        sections.push({ title: "ALEX", lines: splitMultiline(formatRatingMemo(student.alex)) });
-      }
-      if (project.settings.includeFields.vocabTest && student.vocabTest) {
-        sections.push({ title: "단어시험", lines: splitMultiline(student.vocabTest) });
-      }
-      if (project.settings.includeFields.score && hasScore(score)) {
-        const scoreLines = [];
-        const scoreBits = [];
-        if (score.total) scoreBits.push(`총점 ${score.total}`);
-        if (score.lc) scoreBits.push(`LC ${score.lc}`);
-        if (score.rc) scoreBits.push(`RC ${score.rc}`);
-        if (score.vo) scoreBits.push(`VO ${score.vo}`);
-        if (score.gr) scoreBits.push(`GR ${score.gr}`);
-        if (scoreBits.length) scoreLines.push(scoreBits.join(" / "));
-        if (score.good) scoreLines.push(`잘한 점: ${score.good}`);
-        if (score.problem) scoreLines.push(`보완점: ${score.problem}`);
-        if (score.improvement) scoreLines.push(`개선 방향: ${score.improvement}`);
-        if (scoreLines.length) {
-          sections.push({ title: `${project.settings.testType} 성적`, lines: scoreLines.flatMap(splitMultiline) });
-        }
-      }
-      if (project.settings.includeFields.lowScoreCare && student.lowScoreCare) {
-        sections.push({ title: "저득점 관리", lines: splitMultiline(student.lowScoreCare) });
-      }
-      project.settings.extraFields.forEach(field => {
-        const value = student.extraFieldValues?.[field.id];
-        if (value) sections.push({ title: field.name, lines: splitMultiline(value) });
-      });
-      if (project.settings.includeFields.specialNote && student.specialNote) {
-        sections.push({ title: "특이사항", lines: splitMultiline(student.specialNote) });
-      }
-      if (project.settings.includeFields.springSchedule) {
-        const schedule = project.settings.schedule[student.classType] || {};
-        const scheduleLines = [];
-        if (project.settings.includeFields.springScheduleItems?.termTest !== false && schedule.termTest) scheduleLines.push(`Term Test ${schedule.termTest}`);
-        if (project.settings.includeFields.springScheduleItems?.eopAlexAward !== false && schedule.eopAlexAward) scheduleLines.push(`EOP/ALEX Award ${schedule.eopAlexAward}`);
-        if (project.settings.includeFields.springScheduleItems?.marketDay !== false && schedule.marketDay) scheduleLines.push(`Market Day ${schedule.marketDay}`);
-        if (schedule.summerStart) scheduleLines.push(`여름학기 시작 ${schedule.summerStart}`);
-        if (scheduleLines.length) sections.push({ title: "주요 일정", lines: scheduleLines });
-      }
-      if (project.settings.includeFields.summerSpecial) {
-        sections.push({ title: "여름특강 안내", lines: ["여름특강 관련 안내가 필요한 경우 별도로 안내드리겠습니다."] });
-      }
-      if (project.settings.includeFields.registration) {
-        sections.push({ title: "등록 안내", lines: ["등록 관련 안내가 필요한 경우 학원으로 문의 부탁드립니다."] });
-      }
-
-      // 렌더링: 헤더 + 빈 줄 + (번호. 소제목 / 들여쓴 내용 / 빈 줄) 반복
-      const out = [];
-      out.push(`[${title}]`);
-      out.push(`${student.name} (${student.className}) 상담 기록입니다.`);
-      out.push("");
-
-      sections.forEach((section, i) => {
-        out.push(`${i + 1}. ${section.title}`);
-        section.lines.forEach(line => {
-          // 빈 줄은 들여쓰기 없이 공백 라인으로
-          out.push(line.trim() === "" ? "" : INDENT + line);
-        });
-        out.push(""); // 섹션 사이 빈 줄
-      });
-
-      // 마지막 trailing 빈 줄 제거
-      return out.join("\n").replace(/\n+$/, "");
-    }
-
-    function splitMultiline(text) {
-      return String(text ?? "").replace(/\r\n/g, "\n").split("\n");
-    }
-
-    function hasRatingMemo(obj) {
-      return Boolean(obj?.rating || obj?.memo);
-    }
-    function formatRatingMemo(obj) {
-      return [obj?.rating, obj?.memo].filter(Boolean).join(" - ");
-    }
-    function hasScore(score) {
-      return ["lc", "rc", "vo", "gr", "total", "good", "problem", "improvement"].some(key => String(score?.[key] || "").trim());
-    }
-
-    async function copyText(text) {
-      try {
-        await navigator.clipboard.writeText(text);
-      } catch {
-        const textarea = document.createElement("textarea");
-        textarea.value = text;
-        document.body.appendChild(textarea);
-        textarea.select();
-        document.execCommand("copy");
-        textarea.remove();
-      }
-      showToast("복사했습니다.");
-    }
-
-    function copyCurrentConsultationText() {
-      const student = project.students.find(s => s.id === state.selectedStudentId) || project.students[0];
-      if (!student) return alert("복사할 학생이 없습니다.");
-      copyText(buildConsultationText(student));
-    }
-
-    function copyAllConsultationTexts() {
-      if (project.students.length === 0) return alert("복사할 학생이 없습니다.");
-      const text = project.students.map(buildConsultationText).join("\n\n------------------------------\n\n");
-      copyText(text);
-    }
-
-    function saveProjectAsJSON() {
-      saveProjectToLocalStorageNow();
-      const blob = new Blob([JSON.stringify(project, null, 2)], { type: "application/json;charset=utf-8" });
-      const a = document.createElement("a");
-      const date = new Date().toISOString().slice(0, 10);
-      a.href = URL.createObjectURL(blob);
-      a.download = `${makeProjectId(project)}_${date}.json`;
-      document.body.appendChild(a);
-      a.click();
-      URL.revokeObjectURL(a.href);
-      a.remove();
-    }
-
-    function loadProjectFromJSONFile(event) {
-      const file = event.target.files?.[0];
-      event.target.value = "";
-      if (!file) return;
-      const reader = new FileReader();
-      reader.onload = () => {
-        const data = safeParseJson(reader.result);
-        if (!data) return alert("JSON 파일을 읽을 수 없습니다.");
-        if (project.sync.hasUnsavedChanges && !confirm("현재 서버 저장되지 않은 변경사항이 있습니다. JSON 파일로 덮어쓰시겠습니까?")) return;
-        project = normalizeProjectShape(data);
-        saveProjectToLocalStorageNow();
-        renderAll();
-        showToast("JSON 파일을 불러왔습니다.");
-      };
-      reader.readAsText(file, "utf-8");
-    }
-
-    function loadProjectFromLocalStorage() {
-      const currentData = localStorage.getItem(getLocalStorageKey());
-      if (currentData) {
-        const parsed = safeParseJson(currentData);
-        if (parsed) {
-          project = normalizeProjectShape(parsed);
-          return true;
-        }
-      }
-      const v1Data = localStorage.getItem("consultationProject");
-      if (v1Data) {
-        const ok = confirm("이전 버전(v1)의 저장 데이터가 발견되었습니다. v2 형식으로 불러오시겠습니까?");
-        if (ok) {
-          const parsed = safeParseJson(v1Data);
-          if (parsed) {
-            project = normalizeProjectShape(parsed);
-            saveProjectToLocalStorageNow();
-            return true;
-          }
-        }
-      }
-      return false;
-    }
-
-    function showLocalProjectsModal() {
-      const list = $("localProjectsList");
-      const keys = Object.keys(localStorage).filter(key => key.startsWith("consultationProject__")).sort();
-      if (keys.length === 0) {
-        list.innerHTML = `<div class="empty-state">로컬 저장 프로젝트가 없습니다.</div>`;
-      } else {
-        list.innerHTML = keys.map(key => {
-          const data = safeParseJson(localStorage.getItem(key), {});
-          const name = data?.projectName || key.replace("consultationProject__", "");
-          const updated = data?.updatedAt ? data.updatedAt.slice(0, 19).replace("T", " ") : "-";
-          return `<div class="local-item">
-            <div><strong>${escapeHtml(name)}</strong><div class="student-meta mono">${escapeHtml(key.replace("consultationProject__", ""))}</div><div class="student-meta">업데이트: ${escapeHtml(updated)} · 학생 ${data?.students?.length || 0}명</div></div>
-            <button class="small" data-key="${escapeHtml(key)}" type="button">불러오기</button>
-          </div>`;
-        }).join("");
-        list.querySelectorAll("button[data-key]").forEach(btn => {
-          btn.addEventListener("click", () => {
-            if (project.sync.hasUnsavedChanges && !confirm("현재 서버 저장되지 않은 변경사항이 있습니다. 로컬 프로젝트를 불러오면 현재 화면이 바뀝니다. 계속하시겠습니까?")) return;
-            const parsed = safeParseJson(localStorage.getItem(btn.dataset.key));
-            if (!parsed) return alert("로컬 프로젝트를 읽을 수 없습니다.");
-            project = normalizeProjectShape(parsed);
-            state.selectedStudentId = project.students[0]?.id || "";
-            $("localProjectsModal").classList.remove("show");
-            renderAll();
-            showToast("로컬 프로젝트를 불러왔습니다.");
-          });
-        });
-      }
-      $("localProjectsModal").classList.add("show");
-    }
-
-    function createNewProject() {
-      if (project.sync.hasUnsavedChanges && !confirm("현재 서버 저장되지 않은 변경사항이 있습니다. 새 프로젝트를 만들까요?")) return;
-      project = createDefaultProject();
-      state.activeCriterion = "roster";
-      state.currentPage = 0;
-      state.selectedStudentId = "";
-      saveProjectToLocalStorageNow();
-      renderAll();
-    }
-
-    function isFirebaseConfigured() {
-      return Boolean(firebaseConfig.apiKey && firebaseConfig.projectId && firebaseConfig.appId);
-    }
-
-    async function initFirebase() {
-      if (!isFirebaseConfigured()) {
-        firebaseReady = false;
-        project.sync.firebaseEnabled = false;
-        setServerStatus("Firebase 미설정 / JSON 백업 가능");
-        renderFirebaseBadge();
-        return;
-      }
-      try {
-        const [appMod, firestoreMod, authMod] = await Promise.all([
-          import("https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js"),
-          import("https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js"),
-          import("https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js")
-        ]);
-        fb = { ...appMod, ...firestoreMod, ...authMod };
-        firebaseApp = fb.initializeApp(firebaseConfig);
-        db = fb.getFirestore(firebaseApp);
-        auth = fb.getAuth(firebaseApp);
-        firebaseReady = true;
-        project.sync.firebaseEnabled = true;
-        fb.onAuthStateChanged(auth, (user) => {
-          currentUser = user || null;
-          renderAuthState();
-          renderFirebaseBadge();
-        });
-        setServerStatus("Firebase 연결됨");
-      } catch (error) {
-        console.error(error);
-        firebaseReady = false;
-        project.sync.firebaseEnabled = false;
-        setServerStatus("Firebase 초기화 실패");
-      }
-      renderFirebaseBadge();
-    }
-
-    function renderFirebaseBadge() {
-      const badge = $("firebaseBadge");
-      if (!firebaseReady) {
-        badge.textContent = "Firebase 미설정";
-        badge.className = "badge warn";
-      } else if (currentUser) {
-        badge.textContent = `Firebase 로그인: ${currentUser.email}`;
-        badge.className = "badge ok";
-      } else {
-        badge.textContent = "Firebase 연결됨 / 미로그인";
-        badge.className = "badge warn";
-      }
-    }
-
-    function renderAuthState() {
-      const info = $("authInfo");
-      const infoTop = $("authInfoTop");
-      const emailEl = $("authEmail");
-      const pwdEl = $("authPassword");
-      const loginBtn = $("loginBtn");
-      const logoutBtn = $("logoutBtn");
-
-      if (!firebaseReady) {
-        // Firebase 미설정: 입력란 숨기고 경고 뱃지 표시
-        info.textContent = "Firebase 설정값이 비어 있습니다. 로컬 저장과 JSON 백업은 그대로 사용할 수 있습니다.";
-        infoTop.textContent = "⚠ Firebase 미설정";
-        infoTop.className = "auth-info warn";
-        infoTop.hidden = false;
-        emailEl.hidden = true;
-        pwdEl.hidden = true;
-        loginBtn.hidden = true;
-        logoutBtn.hidden = true;
-      } else if (currentUser) {
-        // 로그인 상태: 입력란 숨기고 이메일 + 로그아웃 버튼 표시
-        info.textContent = `로그인됨: ${currentUser.email}`;
-        infoTop.textContent = `✓ ${currentUser.email}`;
-        infoTop.className = "auth-info ok";
-        infoTop.hidden = false;
-        emailEl.hidden = true;
-        pwdEl.hidden = true;
-        loginBtn.hidden = true;
-        logoutBtn.hidden = false;
-      } else {
-        // Firebase 연결됨, 미로그인: 입력란 + 로그인 버튼 표시
-        info.textContent = "Firebase는 연결되었습니다. Firestore 규칙이 로그인 필수라면 이메일 로그인 후 저장하세요.";
-        infoTop.hidden = true;
-        emailEl.hidden = false;
-        pwdEl.hidden = false;
-        loginBtn.hidden = false;
-        logoutBtn.hidden = true;
-      }
-    }
-
-    async function loginWithEmail() {
-      if (!firebaseReady || !auth) return alert("Firebase 설정이 필요합니다.");
-      const email = $("authEmail").value.trim();
-      const password = $("authPassword").value;
-      if (!email || !password) return alert("이메일과 비밀번호를 입력해주세요.");
-      try {
-        await fb.signInWithEmailAndPassword(auth, email, password);
-        showToast("Firebase 로그인 완료");
-      } catch (error) {
-        console.error(error);
-        alert(`로그인 실패: ${error.message || error}`);
-      }
-    }
-
-    async function logout() {
-      if (!firebaseReady || !auth) return;
-      await fb.signOut(auth);
-      showToast("로그아웃했습니다.");
-    }
-
-    async function saveProjectToFirebase() {
-      saveProjectToLocalStorageNow();
-      if (!firebaseReady || !db) {
-        const ok = confirm("Firebase 연결이 되어 있지 않습니다. 현재 프로젝트를 JSON 파일로 저장하시겠습니까?");
-        if (ok) saveProjectAsJSON();
-        return;
-      }
-      const projectId = makeProjectId(project);
-      project.sync.projectId = projectId;
-      setServerStatus("서버 저장 중...");
-      try {
-        const dirtyIds = Object.keys(project.sync.dirtyStudentIds || {});
-        const dirtyStudents = project.students.filter(s => dirtyIds.includes(s.id));
-
-        if (project.sync.settingsDirty || !project.sync.lastServerSavedAt) {
-          await saveProjectMeta(projectId);
-        }
-        if (dirtyStudents.length > 0) {
-          await saveDirtyStudentsInChunks(projectId, dirtyStudents);
-        }
-        const savedAt = new Date().toISOString();
-        project.students.forEach(student => {
-          if (dirtyIds.includes(student.id)) {
-            student._dirty = false;
-            student._lastSavedAt = savedAt;
-          }
-        });
-        project.sync.settingsDirty = false;
-        project.sync.dirtyStudentIds = {};
-        project.sync.hasUnsavedChanges = false;
-        project.sync.lastServerSavedAt = savedAt;
-        saveProjectToLocalStorageNow();
-        renderAll({ keepPage: true });
-        setServerStatus(`✓ 서버 저장 완료 ${savedAt.slice(0, 19).replace("T", " ")}`);
-        showToast(`서버 저장 완료: 학생 ${dirtyStudents.length}명`);
-      } catch (error) {
-        console.error(error);
-        setServerStatus("서버 저장 실패");
-        alert(`서버 저장에 실패했습니다. 로컬 임시 저장 데이터는 유지됩니다.\n\n${error.message || error}`);
-      }
-    }
-
-    async function saveProjectMeta(projectId) {
-      const metaRef = fb.doc(db, "consultationProjects", projectId);
-      await fb.setDoc(metaRef, {
-        version: project.version,
-        projectName: project.projectName,
-        teacherName: project.settings.teacherName,
-        year: project.settings.year,
-        semester: project.settings.semester,
-        consultationType: project.settings.consultationType,
-        testType: project.settings.testType,
-        settings: {
-          includeFields: project.settings.includeFields || {},
-          extraFields: project.settings.extraFields || [],
-          extraSchedules: project.settings.extraSchedules || [],
-          schedule: project.settings.schedule || {},
-          pageSize: project.settings.pageSize || 20
-        },
-        studentCount: project.students.length,
-        updatedAt: fb.serverTimestamp(),
-        updatedBy: currentUser?.email || "anonymous"
-      }, { merge: true });
-    }
-
-    async function saveDirtyStudents(projectId, dirtyStudents) {
-      const batch = fb.writeBatch(db);
-      dirtyStudents.forEach(student => {
-        const ref = fb.doc(db, "consultationProjects", projectId, "students", student.id);
-        const cleanStudent = removeInternalFields(student);
-        batch.set(ref, { ...cleanStudent, updatedAt: fb.serverTimestamp(), updatedBy: currentUser?.email || "anonymous" }, { merge: true });
-      });
-      await batch.commit();
-    }
-
-    async function saveDirtyStudentsInChunks(projectId, dirtyStudents, chunkSize = 450) {
-      for (let i = 0; i < dirtyStudents.length; i += chunkSize) {
-        const chunk = dirtyStudents.slice(i, i + chunkSize);
-        await saveDirtyStudents(projectId, chunk);
-      }
-    }
-
-    function removeInternalFields(student) {
-      const cleaned = structuredCloneSafe(student);
-      delete cleaned._dirty;
-      delete cleaned._lastSavedAt;
-      return cleaned;
-    }
-
-    function structuredCloneSafe(value) {
-      if (typeof structuredClone === "function") return structuredClone(value);
-      return JSON.parse(JSON.stringify(value));
-    }
-
-    async function loadProjectFromFirebase() {
-      if (!firebaseReady || !db) {
-        alert("Firebase 설정이 필요합니다.");
-        return;
-      }
-      if (project.sync.hasUnsavedChanges) {
-        const ok = confirm("현재 로컬에 서버 저장되지 않은 변경사항이 있습니다. 서버 데이터를 불러오면 현재 작업 내용이 덮어써질 수 있습니다. 계속하시겠습니까?");
-        if (!ok) return;
-      }
-      const projectId = makeProjectId(project);
-      setServerStatus("서버에서 불러오는 중...");
-      try {
-        const metaRef = fb.doc(db, "consultationProjects", projectId);
-        const metaSnap = await fb.getDoc(metaRef);
-        if (!metaSnap.exists()) {
-          setServerStatus("서버 데이터 없음");
-          alert("해당 상담자/프로젝트의 서버 저장 데이터가 없습니다.");
-          return;
-        }
-        const meta = normalizeFirestoreObject(metaSnap.data());
-        const studentsRef = fb.collection(db, "consultationProjects", projectId, "students");
-        const studentsSnap = await fb.getDocs(studentsRef);
-        const students = [];
-        studentsSnap.forEach(docSnap => {
-          const data = normalizeFirestoreObject(docSnap.data());
-          students.push(normalizeStudent({ id: docSnap.id, ...data, _dirty: false, _lastSavedAt: data.updatedAt || "" }, students.length));
-        });
-        project.settings = {
-          ...project.settings,
-          ...(meta.settings || {}),
-          teacherName: meta.teacherName || project.settings.teacherName,
-          year: meta.year || project.settings.year,
-          semester: meta.semester || project.settings.semester,
-          consultationType: meta.consultationType || project.settings.consultationType,
-          testType: meta.testType || project.settings.testType,
-          includeFields: {
-            ...project.settings.includeFields,
-            ...(meta.settings?.includeFields || {})
-          },
-          schedule: {
-            ...project.settings.schedule,
-            ...(meta.settings?.schedule || {})
-          }
-        };
-        project.projectName = meta.projectName || project.projectName;
-        project.students = students;
-        project.sync = {
-          projectId,
-          settingsDirty: false,
-          dirtyStudentIds: {},
-          lastServerLoadedAt: new Date().toISOString(),
-          lastServerSavedAt: meta.updatedAt || "",
-          hasUnsavedChanges: false,
-          firebaseEnabled: true
-        };
-        state.selectedStudentId = project.students[0]?.id || "";
-        saveProjectToLocalStorageNow();
-        renderAll();
-        setServerStatus("서버에서 불러오기 완료");
-        showToast(`서버에서 ${students.length}명 데이터를 불러왔습니다.`);
-      } catch (error) {
-        console.error(error);
-        setServerStatus("서버 불러오기 실패");
-        alert(`서버 불러오기에 실패했습니다.\n\n${error.message || error}`);
-      }
-    }
-
-    function normalizeFirestoreObject(obj) {
-      const out = Array.isArray(obj) ? [] : {};
-      Object.entries(obj || {}).forEach(([key, value]) => {
-        if (value && typeof value.toDate === "function") {
-          out[key] = value.toDate().toISOString();
-        } else if (value && typeof value === "object" && !Array.isArray(value)) {
-          out[key] = normalizeFirestoreObject(value);
-        } else if (Array.isArray(value)) {
-          out[key] = value.map(item => item && typeof item === "object" ? normalizeFirestoreObject(item) : item);
-        } else {
-          out[key] = value;
-        }
-      });
-      return out;
-    }
-
-    function escapeHtml(value) {
-      return String(value ?? "")
-        .replace(/&/g, "&amp;")
-        .replace(/</g, "&lt;")
-        .replace(/>/g, "&gt;")
-        .replace(/"/g, "&quot;")
-        .replace(/'/g, "&#039;");
-    }
-
-    async function boot() {
-      bindEvents();
-      loadProjectFromLocalStorage();
-      renderAll();
-      await initFirebase();
-      renderAuthState();
-      renderSaveStatus();
-    }
-
-    boot();
-  </script>
+  <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  <script type="module" src="./consultation_app.js"></script>
 </body>
 </html>
