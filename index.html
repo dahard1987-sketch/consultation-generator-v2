@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>상담기록 메이커 v. 0.78</title>
-  <link rel="icon" href="./favicon.svg" type="image/svg+xml" />
+  <link rel="icon" href="./favicon.svg?v=2" type="image/svg+xml" />
   <style>
     :root {
       --bg: #f4f6fb;
@@ -379,12 +379,13 @@
 
     .toolbar {
       display: grid;
-      grid-template-columns: minmax(170px, 1.2fr) minmax(130px, 0.7fr) minmax(140px, 0.8fr) minmax(240px, 1.3fr);
+      grid-template-columns: minmax(170px, 1.2fr) minmax(130px, 0.7fr) minmax(140px, 0.8fr);
       gap: 10px;
       align-items: end;
       margin-bottom: 12px;
     }
     .toolbar > div { min-width: 0; }
+    .toolbar-help { grid-column: 1 / -1; }
 
     .student-card {
       border: 1px solid var(--line);
@@ -495,6 +496,16 @@
       flex-wrap: wrap;
       align-items: center;
     }
+    .score-upload-config {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      gap: 10px;
+      align-items: end;
+      padding: 12px;
+      border: 1px solid var(--line);
+      border-radius: var(--radius-sm);
+      background: #f8fafc;
+    }
     .bulk-score-table-wrap {
       overflow: auto;
       border: 1px solid var(--line);
@@ -560,6 +571,13 @@
     .progress-name {
       min-width: 0;
       word-break: break-word;
+    }
+    .progress-group {
+      margin-top: 10px;
+      padding: 7px 2px 2px;
+      color: #111827;
+      font-size: 12.5px;
+      font-weight: 800;
     }
     .progress-dot {
       width: 10px;
@@ -695,12 +713,14 @@
       .form-grid { grid-template-columns: 1fr; }
       .checkbox-grid { grid-template-columns: 1fr; }
       .score-grid { grid-template-columns: repeat(2, 1fr); }
+      .score-upload-config { grid-template-columns: 1fr 1fr; }
       .bulk-score-actions { flex-direction: column; align-items: stretch; }
       .input-row { grid-template-columns: 1fr; }
       .student-head { align-items: flex-start; flex-direction: column; }
     }
     @media (max-width: 560px) {
       .toolbar { grid-template-columns: 1fr; }
+      .score-upload-config { grid-template-columns: 1fr; }
     }
 
     @media print {
@@ -931,7 +951,7 @@
                     <option value="complete">입력 완료</option>
                   </select>
                 </div>
-                <div>
+                <div class="toolbar-help">
                   <label>작업 안내</label>
                   <div class="notice" style="padding:10px;">학생 목록을 먼저 넣은 뒤, 탭별로 상담 내용을 입력하세요.</div>
                 </div>
@@ -988,6 +1008,6 @@
   <div class="toast" id="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./consultation_app.js?v=20260501-8"></script>
+  <script type="module" src="./consultation_app.js?v=20260501-9"></script>
 </body>
 </html>
