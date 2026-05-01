@@ -2194,82 +2194,133 @@ async function saveProjectToFirebase() {
   const projectId = makeProjectId(project);
   project.sync.projectId = projectId;
   setServerStatus("서버 저장 중...");
-  try {
-    const dirtyIds = Object.keys(project.sync.dirtyStudentIds || {});
-    const deletedIds = Object.keys(project.sync.deletedStudentIds || {});
-    const dirtyStudents = project.students.filter((student) => dirtyIds.includes(student.id));
-    if (project.sync.settingsDirty || !project.sync.lastServerSavedAt) {
-      const metaRef = fb.doc(db, "consultationProjects", projectId);
-      await fb.setDoc(metaRef, {
-        version: project.version,
-        projectName: project.projectName,
-        teacherName: project.settings.teacherName,
-        year: project.settings.year,
-        semester: project.settings.semester,
-        nextSemester: project.settings.nextSemester,
-        consultationType: project.settings.consultationType,
-        testType: project.settings.testType,
-        settings: {
-          includeFields: project.settings.includeFields,
-          extraFields: project.settings.extraFields,
-          schedule: project.settings.schedule,
-          pageSize: project.settings.pageSize
-        },
-        scoreImport: project.scoreImport ? {
-          importKey: project.scoreImport.importKey || makeScoreImportId(),
-          fileName: project.scoreImport.fileName || "",
-          criteria: project.scoreImport.criteria || {},
-          importedAt: project.scoreImport.importedAt || "",
-          importedBy: project.scoreImport.importedBy || "",
-          rowCount: getScoreImportRows(project.scoreImport).length
-        } : null,
-        studentCount: project.students.length,
-        updatedAt: fb.serverTimestamp(),
-        updatedBy: currentUser?.email || "anonymous"
-      }, { merge: true });
+  const dirtyIds = Object.keys(project.sync.dirtyStudentIds || {});
+  const deletedIds = Object.keys(project.sync.deletedStudentIds || {});
+  const dirtyStudents = project.students.filter((student) => dirtyIds.includes(student.id));
+  const result = { meta: false, students: 0, deleted: 0, scoreImport: false, failed: [] };
+
+  if (project.sync.settingsDirty || !project.sync.lastServerSavedAt) {
+    try {
+      await saveProjectMetaToFirebase(projectId);
+      result.meta = true;
+    } catch (error) {
+      console.warn("프로젝트 메타 저장 실패", error);
+      result.failed.push("프로젝트 설정");
     }
-    if (project.scoreImport && getScoreImportRows(project.scoreImport).length > 0) {
+  }
+
+  if (project.scoreImport && getScoreImportRows(project.scoreImport).length > 0) {
+    try {
       await saveScoreImportToFirebase(project.scoreImport);
+      result.scoreImport = true;
+    } catch (error) {
+      console.warn("성적 원본 서버 보관 실패", error);
+      result.failed.push("성적 원본");
     }
-    if (dirtyStudents.length > 0) {
-      for (let i = 0; i < dirtyStudents.length; i += 400) {
-        const batch = fb.writeBatch(db);
-        dirtyStudents.slice(i, i + 400).forEach((student) => {
-          const ref = fb.doc(db, "consultationProjects", projectId, "students", student.id);
-          batch.set(ref, { ...removeInternalFields(student), updatedAt: fb.serverTimestamp(), updatedBy: currentUser?.email || "anonymous" }, { merge: true });
-        });
-        await batch.commit();
-      }
-    }
-    if (deletedIds.length > 0) {
-      for (let i = 0; i < deletedIds.length; i += 400) {
-        const batch = fb.writeBatch(db);
-        deletedIds.slice(i, i + 400).forEach((studentId) => {
-          const ref = fb.doc(db, "consultationProjects", projectId, "students", studentId);
-          batch.delete(ref);
-        });
-        await batch.commit();
-      }
-    }
+  }
+
+  if (dirtyStudents.length > 0) {
+    const savedIds = await saveDirtyStudentsToFirebase(projectId, dirtyStudents, result);
     const savedAt = new Date().toISOString();
     project.students.forEach((student) => {
-      if (dirtyIds.includes(student.id)) {
+      if (savedIds.has(student.id)) {
         student._dirty = false;
         student._lastSavedAt = savedAt;
+        delete project.sync.dirtyStudentIds[student.id];
       }
     });
-    project.sync.settingsDirty = false;
-    project.sync.dirtyStudentIds = {};
-    project.sync.deletedStudentIds = {};
-    project.sync.hasUnsavedChanges = false;
-    project.sync.lastServerSavedAt = savedAt;
-    saveProjectToLocalStorageNow();
-    renderAll({ keepPage: true });
-    showToast(`서버 저장 완료: 저장 ${dirtyStudents.length}명, 삭제 ${deletedIds.length}명`);
-  } catch (error) {
-    console.error(error);
-    setServerStatus("서버 저장 실패");
-    alert(`서버 저장에 실패했습니다.\n\n${error.message || error}`);
+  }
+
+  if (deletedIds.length > 0) {
+    await deleteStudentsFromFirebase(projectId, deletedIds, result);
+  }
+
+  if (result.meta) project.sync.settingsDirty = false;
+  project.sync.hasUnsavedChanges = project.sync.settingsDirty || Object.keys(project.sync.dirtyStudentIds || {}).length > 0;
+  if (result.meta || result.students > 0 || result.deleted > 0 || result.scoreImport) {
+    project.sync.lastServerSavedAt = new Date().toISOString();
+  }
+  saveProjectToLocalStorageNow();
+  renderAll({ keepPage: true });
+
+  if (result.failed.length > 0) {
+    setServerStatus(`부분 저장됨: 권한 확인 필요 (${result.failed.join(", ")})`);
+    showToast(`부분 저장됨: ${result.failed.join(", ")} 권한 확인 필요`);
+  } else {
+    setServerStatus("서버 저장 완료");
+    showToast(`서버 저장 완료: 저장 ${result.students}명, 삭제 ${result.deleted}명`);
+  }
+}
+
+async function saveProjectMetaToFirebase(projectId) {
+  const metaRef = fb.doc(db, "consultationProjects", projectId);
+  await fb.setDoc(metaRef, {
+    version: project.version,
+    projectName: project.projectName,
+    teacherName: project.settings.teacherName,
+    year: project.settings.year,
+    semester: project.settings.semester,
+    nextSemester: project.settings.nextSemester,
+    consultationType: project.settings.consultationType,
+    testType: project.settings.testType,
+    settings: {
+      includeFields: project.settings.includeFields,
+      extraFields: project.settings.extraFields,
+      schedule: project.settings.schedule,
+      pageSize: project.settings.pageSize
+    },
+    scoreImport: project.scoreImport ? {
+      importKey: project.scoreImport.importKey || makeScoreImportId(),
+      fileName: project.scoreImport.fileName || "",
+      criteria: project.scoreImport.criteria || {},
+      importedAt: project.scoreImport.importedAt || "",
+      importedBy: project.scoreImport.importedBy || "",
+      rowCount: getScoreImportRows(project.scoreImport).length
+    } : null,
+    studentCount: project.students.length,
+    updatedAt: fb.serverTimestamp(),
+    updatedBy: currentUser?.email || "anonymous"
+  }, { merge: true });
+}
+
+async function saveDirtyStudentsToFirebase(projectId, dirtyStudents, result) {
+  const savedIds = new Set();
+  for (let i = 0; i < dirtyStudents.length; i += 400) {
+    const chunk = dirtyStudents.slice(i, i + 400);
+    try {
+      const batch = fb.writeBatch(db);
+      chunk.forEach((student) => {
+        const ref = fb.doc(db, "consultationProjects", projectId, "students", student.id);
+        batch.set(ref, { ...removeInternalFields(student), updatedAt: fb.serverTimestamp(), updatedBy: currentUser?.email || "anonymous" }, { merge: true });
+      });
+      await batch.commit();
+      chunk.forEach((student) => savedIds.add(student.id));
+      result.students += chunk.length;
+    } catch (error) {
+      console.warn("학생 저장 배치 실패", error);
+      result.failed.push(`학생 ${chunk.length}명`);
+    }
+  }
+  return savedIds;
+}
+
+async function deleteStudentsFromFirebase(projectId, deletedIds, result) {
+  for (let i = 0; i < deletedIds.length; i += 400) {
+    const chunk = deletedIds.slice(i, i + 400);
+    try {
+      const batch = fb.writeBatch(db);
+      chunk.forEach((studentId) => {
+        const ref = fb.doc(db, "consultationProjects", projectId, "students", studentId);
+        batch.delete(ref);
+      });
+      await batch.commit();
+      chunk.forEach((studentId) => delete project.sync.deletedStudentIds[studentId]);
+      result.deleted += chunk.length;
+    } catch (error) {
+      console.warn("학생 삭제 배치 실패", error);
+      chunk.forEach((studentId) => delete project.sync.deletedStudentIds[studentId]);
+      result.failed.push(`삭제 ${chunk.length}명`);
+    }
   }
 }
 
