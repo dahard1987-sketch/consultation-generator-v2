@@ -2219,8 +2219,8 @@ async function saveProjectToFirebase() {
     }
   }
 
-  if (dirtyStudents.length > 0) {
-    const savedIds = await saveDirtyStudentsToFirebase(projectId, dirtyStudents, result);
+  if (dirtyStudents.length > 0 || deletedIds.length > 0) {
+    const savedIds = await saveStudentsAsFields(projectId, dirtyStudents, deletedIds, result);
     const savedAt = new Date().toISOString();
     project.students.forEach((student) => {
       if (savedIds.has(student.id)) {
@@ -2229,10 +2229,8 @@ async function saveProjectToFirebase() {
         delete project.sync.dirtyStudentIds[student.id];
       }
     });
-  }
-
-  if (deletedIds.length > 0) {
-    await deleteStudentsFromFirebase(projectId, deletedIds, result);
+    deletedIds.forEach((id) => delete project.sync.deletedStudentIds[id]);
+    result.deleted = deletedIds.length;
   }
 
   if (result.meta) project.sync.settingsDirty = false;
@@ -2283,45 +2281,34 @@ async function saveProjectMetaToFirebase(projectId) {
   }, { merge: true });
 }
 
-async function saveDirtyStudentsToFirebase(projectId, dirtyStudents, result) {
+async function saveStudentsAsFields(projectId, dirtyStudents, deletedIds, result) {
+  const ref = fb.doc(db, "consultationProjects", projectId);
   const savedIds = new Set();
-  for (let i = 0; i < dirtyStudents.length; i += 400) {
-    const chunk = dirtyStudents.slice(i, i + 400);
+  const updates = {};
+  dirtyStudents.forEach((student) => {
+    updates[`students.${student.id}`] = removeInternalFields(student);
+  });
+  deletedIds.forEach((id) => {
+    updates[`students.${id}`] = fb.deleteField();
+  });
+  const entries = Object.entries(updates);
+  if (entries.length === 0) return savedIds;
+  const chunkSize = 100;
+  for (let i = 0; i < entries.length; i += chunkSize) {
+    const chunk = Object.fromEntries(entries.slice(i, i + chunkSize));
     try {
-      const batch = fb.writeBatch(db);
-      chunk.forEach((student) => {
-        const ref = fb.doc(db, "consultationProjects", projectId, "students", student.id);
-        batch.set(ref, { ...removeInternalFields(student), updatedAt: fb.serverTimestamp(), updatedBy: currentUser?.email || "anonymous" }, { merge: true });
+      await fb.updateDoc(ref, chunk);
+      dirtyStudents.forEach((s) => {
+        if (`students.${s.id}` in chunk) savedIds.add(s.id);
       });
-      await batch.commit();
-      chunk.forEach((student) => savedIds.add(student.id));
-      result.students += chunk.length;
+      result.students += Object.keys(chunk).filter((k) => !deletedIds.includes(k.replace("students.", ""))).length;
     } catch (error) {
-      console.warn("학생 저장 배치 실패", error);
-      result.failed.push(`학생 ${chunk.length}명`);
+      console.warn("학생 필드 업데이트 실패", error);
+      const failCount = Object.keys(chunk).filter((k) => !deletedIds.includes(k.replace("students.", ""))).length;
+      if (failCount > 0) result.failed.push(`학생 ${failCount}명`);
     }
   }
   return savedIds;
-}
-
-async function deleteStudentsFromFirebase(projectId, deletedIds, result) {
-  for (let i = 0; i < deletedIds.length; i += 400) {
-    const chunk = deletedIds.slice(i, i + 400);
-    try {
-      const batch = fb.writeBatch(db);
-      chunk.forEach((studentId) => {
-        const ref = fb.doc(db, "consultationProjects", projectId, "students", studentId);
-        batch.delete(ref);
-      });
-      await batch.commit();
-      chunk.forEach((studentId) => delete project.sync.deletedStudentIds[studentId]);
-      result.deleted += chunk.length;
-    } catch (error) {
-      console.warn("학생 삭제 배치 실패", error);
-      chunk.forEach((studentId) => delete project.sync.deletedStudentIds[studentId]);
-      result.failed.push(`삭제 ${chunk.length}명`);
-    }
-  }
 }
 
 async function loadProjectFromFirebase() {
@@ -2338,8 +2325,19 @@ async function loadProjectFromFirebase() {
       return alert("이 프로젝트의 서버 저장 데이터가 없습니다.");
     }
     const meta = metaSnap.data();
-    const studentsRef = fb.collection(db, "consultationProjects", projectId, "students");
-    const studentSnap = await fb.getDocs(studentsRef);
+    let students;
+    if (meta.students && typeof meta.students === "object" && !Array.isArray(meta.students)) {
+      students = Object.entries(meta.students).map(([id, data]) => ({ id, ...data })).filter(Boolean);
+    } else {
+      try {
+        const studentsRef = fb.collection(db, "consultationProjects", projectId, "students");
+        const studentSnap = await fb.getDocs(studentsRef);
+        students = studentSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }));
+      } catch (error) {
+        console.warn("서브컬렉션 학생 읽기 실패 (권한 문제일 수 있음):", error);
+        students = [];
+      }
+    }
     const loaded = normalizeProjectShape({
       ...meta,
       settings: {
@@ -2351,7 +2349,7 @@ async function loadProjectFromFirebase() {
         consultationType: meta.consultationType,
         testType: meta.testType
       },
-      students: studentSnap.docs.map((doc) => ({ id: doc.id, ...doc.data() }))
+      students
     });
     loaded.sync.lastServerLoadedAt = new Date().toISOString();
     loaded.sync.lastServerSavedAt = new Date().toISOString();
