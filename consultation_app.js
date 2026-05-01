@@ -44,6 +44,7 @@ const CONSULTATION_LABELS = {
 };
 const SEMESTER_LABELS = { SP: "봄학기", SU: "여름학기", FA: "가을학기", WI: "겨울학기" };
 const SEMESTER_ORDER = ["SP", "SU", "FA", "WI"];
+const YEAR_OPTIONS = ["2026", "2027", "2028"];
 const LEVEL_OPTIONS = ["Alpha", "Demi", "Penta", "Hepta", "Octa", "Nona", "Deca"];
 
 let firebaseApp = null;
@@ -80,7 +81,7 @@ function createDefaultProject() {
     updatedAt: now,
     settings: {
       teacherName: "",
-      year: "26",
+      year: "2026",
       semester: "SP",
       nextSemester: "SU",
       consultationType: "3차정기",
@@ -157,8 +158,19 @@ function displayConsultationType(value) {
   return CONSULTATION_LABELS[value] || value || "";
 }
 
-function semesterText(year, semester) {
-  return `${year || ""}${SEMESTER_LABELS[semester] || semester || ""}`.trim();
+function normalizeYear(value) {
+  const raw = String(value || "").trim();
+  if (/^\d{2}$/.test(raw)) return `20${raw}`;
+  return YEAR_OPTIONS.includes(raw) ? raw : YEAR_OPTIONS[0];
+}
+
+function shortYear(value) {
+  return normalizeYear(value).slice(-2);
+}
+
+function semesterText(year, semester, { short = true } = {}) {
+  const y = short ? shortYear(year) : normalizeYear(year);
+  return `${y || ""}${SEMESTER_LABELS[semester] || semester || ""}`.trim();
 }
 
 function getAutoNextSemester(semester) {
@@ -167,7 +179,7 @@ function getAutoNextSemester(semester) {
 }
 
 function makeAutoProjectNameFromSettings(settings) {
-  return `${semesterText(settings.year, settings.semester)} ${displayConsultationType(settings.consultationType)} ${settings.testType || ""} 상담`
+  return `${semesterText(settings.year, settings.semester, { short: false })} ${displayConsultationType(settings.consultationType)} ${settings.testType || ""} 상담`
     .replace(/\s+/g, " ")
     .trim();
 }
@@ -271,6 +283,9 @@ function normalizeProjectShape(raw) {
     scoreImport: raw?.scoreImport || null
   };
   if (!merged.settings.nextSemester) merged.settings.nextSemester = getAutoNextSemester(merged.settings.semester);
+  merged.settings.year = normalizeYear(merged.settings.year);
+  merged.settings.nextSemester = getAutoNextSemester(merged.settings.semester);
+  if (!["1차정기", "2차정기", "3차정기"].includes(merged.settings.consultationType)) merged.settings.consultationType = "3차정기";
   merged.version = 3;
   merged.students = merged.students.map((student, index) => normalizeStudent(student, index));
   merged.projectName = merged.projectName || makeAutoProjectNameFromSettings(merged.settings);
@@ -420,24 +435,18 @@ function renderProjectId() {
 }
 
 function syncSettingsFromInputs({ autoNext = false } = {}) {
-  const prevAuto = getAutoNextSemester(project.settings.semester);
-  const currentNext = project.settings.nextSemester;
   project.settings.teacherName = $("teacherName").value.trim();
-  project.settings.year = $("year").value.trim();
+  project.settings.year = normalizeYear($("year").value);
   project.settings.semester = $("semester").value;
   project.settings.testType = $("testType").value;
   project.settings.consultationType = $("consultationType").value;
   project.settings.pageSize = Number($("pageSize").value) || 20;
-  if (autoNext || !currentNext || currentNext === prevAuto) {
-    project.settings.nextSemester = getAutoNextSemester(project.settings.semester);
-  } else {
-    project.settings.nextSemester = $("nextSemester").value;
-  }
+  project.settings.nextSemester = getAutoNextSemester(project.settings.semester);
   project.projectName = $("projectName").value.trim() || makeAutoProjectName();
 }
 
 function bindEvents() {
-  ["teacherName", "year", "semester", "testType", "consultationType", "projectName", "pageSize", "nextSemester"].forEach((id) => {
+  ["teacherName", "year", "semester", "testType", "consultationType", "projectName", "pageSize"].forEach((id) => {
     $(id).addEventListener("input", () => {
       syncSettingsFromInputs({ autoNext: id === "semester" });
       state.currentPage = 0;
@@ -554,9 +563,8 @@ function renderAll({ keepPage = false } = {}) {
 
 function renderSettingsInputs() {
   $("teacherName").value = project.settings.teacherName || "";
-  $("year").value = project.settings.year || "26";
+  $("year").value = normalizeYear(project.settings.year);
   $("semester").value = project.settings.semester || "SP";
-  $("nextSemester").value = project.settings.nextSemester || getAutoNextSemester(project.settings.semester || "SP");
   $("consultationType").value = project.settings.consultationType || "3차정기";
   $("testType").value = project.settings.testType || "MT2";
   $("projectName").value = project.projectName || makeAutoProjectName();
@@ -721,7 +729,9 @@ function renderBulkTools() {
           </div>
           <div>
             <label for="scoreUploadYear">연도</label>
-            <input id="scoreUploadYear" placeholder="예: 26" value="${escapeHtml(scoreCriteria.year || project.settings.year || "")}" />
+            <select id="scoreUploadYear">
+              ${YEAR_OPTIONS.map((year) => `<option value="${year}" ${year === normalizeYear(scoreCriteria.year || project.settings.year) ? "selected" : ""}>${year}</option>`).join("")}
+            </select>
           </div>
           <div>
             <label for="scoreUploadLevel">레벨</label>
@@ -742,9 +752,18 @@ function renderBulkTools() {
           <button id="uploadScoreFileBtn" type="button">엑셀 업로드</button>
           <button id="applyScoresBtn" class="primary" type="button">붙여넣기 반영</button>
         </div>
-        <textarea id="scoreTsv" placeholder="이름&#9;반&#9;LC&#9;RC&#9;VO&#9;GR&#9;Total&#10;김도형&#9;Octa 1 2D 2부-3&#9;18&#9;17&#9;20&#9;19&#9;74"></textarea>
+        <textarea id="scoreTsv" placeholder="캠퍼스&#9;이름&#9;학생코드&#9;레벨&#9;수강반&#9;시험명&#9;담임&#9;응시일&#9;Overall&#9;Listening&#9;Reading&#9;Vocabulary&#9;Grammar&#9;소요시간(분)&#9;응시여부&#10;&#9;김도형&#9;&#9;Octa&#9;Octa 1 2D 2부-3&#9;2026 봄학기 Octa MT2&#9;최영진&#9;&#9;74&#9;18&#9;17&#9;20&#9;19&#9;&#9;"></textarea>
         <div class="bulk-score-table-wrap">
           <table class="bulk-score-table">
+            <colgroup>
+              <col class="name-col" />
+              <col class="class-col" />
+              <col class="score-col" />
+              <col class="score-col" />
+              <col class="score-col" />
+              <col class="score-col" />
+              <col class="score-col" />
+            </colgroup>
             <thead>
               <tr><th>이름</th><th>반</th><th>LC</th><th>RC</th><th>VO</th><th>GR</th><th>총점</th></tr>
             </thead>
@@ -793,7 +812,10 @@ function parseTsv(text) {
     .replace(/\r\n/g, "\n")
     .replace(/\r/g, "\n")
     .split("\n")
-    .map((line) => line.split("\t").map((cell) => cell.trim()));
+    .map((line) => {
+      const cells = line.includes("\t") ? line.split("\t") : line.split(/\s{2,}/);
+      return cells.map((cell) => cell.trim());
+    });
 }
 
 function applyRosterFromTextarea(append) {
@@ -931,7 +953,7 @@ function normalizeLevel(value) {
 function readScoreUploadCriteria() {
   return {
     teacherName: $("scoreUploadTeacher")?.value.trim() || project.settings.teacherName || "",
-    year: $("scoreUploadYear")?.value.trim() || project.settings.year || "",
+    year: normalizeYear($("scoreUploadYear")?.value || project.settings.year),
     level: $("scoreUploadLevel")?.value.trim() || "",
     testType: $("scoreUploadTestType")?.value.trim() || project.settings.testType || ""
   };
@@ -1416,8 +1438,9 @@ function getScheduleLines(student) {
     const parts = [schedule.nextTestName, schedule.nextTestDate].filter(Boolean);
     lines.push(`다음 시험: ${parts.join(" / ")}`);
   }
-  if (["3차정기", "4차정기", "학기상담"].includes(consultationType)) {
-    if (project.settings.nextSemester) lines.push(`다음 학기: ${semesterText(project.settings.year, project.settings.nextSemester)}`);
+  if (consultationType === "3차정기") {
+    const nextSemester = getAutoNextSemester(project.settings.semester);
+    lines.push(`다음 학기: ${semesterText(project.settings.year, nextSemester)}`);
     if (schedule.summerStart) lines.push(`다음 학기 시작: ${schedule.summerStart}`);
     if (schedule.termEnd) lines.push(`학기 종료일: ${schedule.termEnd}`);
     if (schedule.eopAlexAward) lines.push(`EOP/ALEX: ${schedule.eopAlexAward}`);
@@ -1428,8 +1451,7 @@ function getScheduleLines(student) {
 
 function buildConsultationTitle() {
   const settings = project.settings || {};
-  const rawYear = String(settings.year || "").trim();
-  const year = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+  const year = normalizeYear(settings.year);
   const semester = SEMESTER_LABELS[settings.semester] || settings.semester || "";
   const consultationType = displayConsultationType(settings.consultationType)
     .replace(/\s*정기/g, "")
@@ -1465,7 +1487,12 @@ function buildConsultationText(student) {
   const scheduleLines = getScheduleLines(student);
   if (scheduleLines.length) sections.push({ title: "일정 안내", lines: scheduleLines });
 
-  const out = [`[${title}]`, ""];
+  const teacherName = project.settings.teacherName || "";
+  const out = [
+    student.name || "",
+    `[${title}]${teacherName ? ` - ${teacherName}` : ""}`,
+    ""
+  ];
   sections.forEach((section, index) => {
     out.push(`${index + 1}. ${section.title}`);
     section.lines.forEach((line) => out.push(line.trim() ? `   ${line}` : ""));

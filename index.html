@@ -100,8 +100,9 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       margin-bottom: 16px;
-      position: static;
-      z-index: 20;
+      position: relative !important;
+      top: auto !important;
+      z-index: 1;
       flex-wrap: wrap;
     }
     .topbar-brand {
@@ -520,8 +521,12 @@
     .bulk-score-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 640px;
+      table-layout: fixed;
+      min-width: 520px;
     }
+    .bulk-score-table col.name-col { width: 72px; }
+    .bulk-score-table col.class-col { width: 150px; }
+    .bulk-score-table col.score-col { width: 72px; }
     .bulk-score-table th,
     .bulk-score-table td {
       border-bottom: 1px solid var(--line);
@@ -534,9 +539,15 @@
       font-size: 12px;
       white-space: nowrap;
     }
+    .bulk-score-table th:first-child,
+    .bulk-score-table td:first-child {
+      white-space: nowrap;
+      word-break: keep-all;
+    }
     .bulk-score-table input,
     .bulk-score-table select {
-      min-width: 76px;
+      width: 100%;
+      min-width: 0;
       padding: 8px 9px;
     }
     .progress-sidebar {
@@ -808,20 +819,15 @@
               </div>
               <div>
                 <label for="year">연도</label>
-                <input id="year" value="26" />
+                <select id="year">
+                  <option value="2026">2026</option>
+                  <option value="2027">2027</option>
+                  <option value="2028">2028</option>
+                </select>
               </div>
               <div>
                 <label for="semester">현재 학기</label>
                 <select id="semester">
-                  <option value="SP">SP</option>
-                  <option value="SU">SU</option>
-                  <option value="FA">FA</option>
-                  <option value="WI">WI</option>
-                </select>
-              </div>
-              <div>
-                <label for="nextSemester">다음 학기</label>
-                <select id="nextSemester">
                   <option value="SP">SP</option>
                   <option value="SU">SU</option>
                   <option value="FA">FA</option>
@@ -844,9 +850,6 @@
                   <option value="1차정기">1차 정기</option>
                   <option value="2차정기">2차 정기</option>
                   <option value="3차정기" selected>3차 정기</option>
-                  <option value="4차정기">4차 정기</option>
-                  <option value="학기상담">학기 상담</option>
-                  <option value="보충상담">보충 상담</option>
                 </select>
               </div>
               <div>
@@ -1018,6 +1021,6 @@
   <div class="toast" id="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./consultation_app.js?v=20260501-9"></script>
+  <script type="module" src="./consultation_app.js?v=20260501-10"></script>
 </body>
 </html>
