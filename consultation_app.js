@@ -98,6 +98,7 @@ function createDefaultProject() {
       schedule: createDefaultSchedule()
     },
     students: [],
+    scoreImport: null,
     sync: {
       projectId: "",
       settingsDirty: false,
@@ -262,7 +263,8 @@ function normalizeProjectShape(raw) {
       dirtyStudentIds: raw?.sync?.dirtyStudentIds || {},
       deletedStudentIds: raw?.sync?.deletedStudentIds || {}
     },
-    students: Array.isArray(raw?.students) ? raw.students : []
+    students: Array.isArray(raw?.students) ? raw.students : [],
+    scoreImport: raw?.scoreImport || null
   };
   if (!merged.settings.nextSemester) merged.settings.nextSemester = getAutoNextSemester(merged.settings.semester);
   merged.version = 3;
@@ -293,6 +295,17 @@ function getStudentByNameAndClass(name, className = "") {
   const candidates = project.students.filter((student) => student.name === name);
   if (!className) return candidates[0];
   return candidates.find((student) => student.className === className);
+}
+
+function getOrCreateStudentFromScoreRow(name, className) {
+  const existing = getStudentByNameAndClass(name, className);
+  if (existing) return { student: existing, created: false };
+  const student = normalizeStudent({ name, className }, project.students.length);
+  student._dirty = true;
+  project.students.push(student);
+  project.sync.dirtyStudentIds[student.id] = true;
+  project.sync.settingsDirty = true;
+  return { student, created: true };
 }
 
 function studentHasAnyInput(student) {
@@ -418,11 +431,13 @@ function bindEvents() {
       syncSettingsFromInputs({ autoNext: id === "semester" });
       state.currentPage = 0;
       markSettingsDirty();
+      if (id === "teacherName") applyScoreImportForCurrentTeacher();
     });
     $(id).addEventListener("change", () => {
       syncSettingsFromInputs({ autoNext: id === "semester" });
       state.currentPage = 0;
       markSettingsDirty();
+      if (id === "teacherName") applyScoreImportForCurrentTeacher();
     });
   });
 
@@ -685,7 +700,7 @@ function renderBulkTools() {
       <div class="student-card score-entry-card">
         <div>
           <div class="section-title">성적 입력</div>
-          <div class="help">표에서 점수만 바로 입력하거나, 예시 엑셀 파일을 내려받아 업로드할 수 있습니다.</div>
+          <div class="help">예시 엑셀 파일을 업로드하면 담당자가 일치하는 학생을 자동으로 작업 목록에 추가하고 성적을 반영합니다.</div>
         </div>
         <div class="bulk-score-actions">
           <button id="downloadScoreTemplateBtn" type="button">예시 엑셀 다운로드</button>
@@ -812,25 +827,37 @@ function normalizeHeader(value) {
     "grammar": "gr",
     "total": "total",
     "overall": "total",
-    "총점": "total"
+    "총점": "total",
+    "담임": "teacherName",
+    "담당자": "teacherName",
+    "강사": "teacherName",
+    "teacher": "teacherName",
+    "teachername": "teacherName",
+    "레벨": "level",
+    "level": "level",
+    "시험명": "testName",
+    "test": "testName",
+    "testname": "testName"
   };
   return map[h] || h;
 }
 
 function detectLevelFromClass(className) {
-  const match = String(className || "").match(/^(Octa|Nona|Deca|Hepta|Penta|Demi|Alpha)/i);
+  const match = String(className || "").match(/(Octa|Nona|Deca|Hepta|Penta|Demi|Alpha)/i);
   return match ? match[1] : "";
 }
 
 function getTestQuestionCounts(testType, className) {
   const test = String(testType || "").trim().toUpperCase();
+  const level = detectLevelFromClass(className).toUpperCase();
   if (test.startsWith("MT")) {
     return { lc: 15, rc: 15, vo: 10, gr: 10 };
   }
   if (test === "TT") {
-    if (/Nona/i.test(className)) return { lc: 20, rc: 20, vo: 10, gr: 10 };
+    if (["NONA", "DECA"].includes(level)) return { lc: 20, rc: 20, vo: 10, gr: 10 };
     return { lc: 15, rc: 15, vo: 5, gr: 5 };
   }
+  if (test === "PRELIM") return { lc: 20, rc: 20, vo: 10, gr: 10 };
   return null;
 }
 
@@ -857,16 +884,29 @@ function convertRawScoresToWrong(scores, testType, className) {
   return result;
 }
 
-function applyScoreRows(rows) {
-  if (rows.length === 0) return { matched: 0, missed: 0 };
+function normalizeTeacherName(value) {
+  return String(value || "").trim().replace(/\s+/g, "");
+}
+
+function scoreRowsHaveTeacherColumn(rows) {
+  if (!rows.length) return false;
+  return rows[0].map(normalizeHeader).includes("teacherName");
+}
+
+function applyScoreRows(rows, options = {}) {
+  if (rows.length === 0) return { matched: 0, missed: 0, added: 0, skippedByTeacher: 0 };
+  const teacherFilter = normalizeTeacherName(options.teacherFilter ?? project.settings.teacherName);
+  const shouldFilterByTeacher = Boolean(teacherFilter && scoreRowsHaveTeacherColumn(rows));
   const rawFirstRow = rows[0].map((cell) => String(cell || "").trim().toLowerCase());
   const isRawFormat = rawFirstRow.some((h) => h === "listening" || h === "overall");
   const header = rows[0].map(normalizeHeader);
-  const hasHeader = header.some((key) => ["name", "className", "lc", "rc", "vo", "gr", "total"].includes(key));
+  const hasHeader = header.some((key) => ["name", "className", "lc", "rc", "vo", "gr", "total", "teacherName"].includes(key));
   const dataRows = hasHeader ? rows.slice(1) : rows;
   const columns = hasHeader ? header : ["name", "className", "lc", "rc", "vo", "gr", "total"];
   let matched = 0;
   let missed = 0;
+  let added = 0;
+  let skippedByTeacher = 0;
   dataRows.forEach((row) => {
     const obj = {};
     columns.forEach((key, index) => {
@@ -874,12 +914,18 @@ function applyScoreRows(rows) {
     });
     const name = String(obj.name || row[0] || "").trim();
     const className = String(obj.className || row[1] || "").trim();
+    const rowTeacher = normalizeTeacherName(obj.teacherName);
+    if (shouldFilterByTeacher && rowTeacher !== teacherFilter) {
+      skippedByTeacher += 1;
+      return;
+    }
     if (!name) return;
-    const student = getStudentByNameAndClass(name, className);
+    const { student, created } = getOrCreateStudentFromScoreRow(name, className);
     if (!student) {
       missed += 1;
       return;
     }
+    if (created) added += 1;
     const score = getScore(student);
     if (isRawFormat) {
       const rawScores = {
@@ -901,16 +947,21 @@ function applyScoreRows(rows) {
     markStudentDirty(student);
     matched += 1;
   });
-  saveProjectToLocalStorageNow();
-  renderAll({ keepPage: true });
-  return { matched, missed };
+  if (matched || added) {
+    project.students = project.students.map((student, index) => normalizeStudent(student, index));
+    if (!state.selectedStudentId && project.students[0]) state.selectedStudentId = project.students[0].id;
+    project.sync.hasUnsavedChanges = true;
+    saveProjectToLocalStorageNow();
+  }
+  if (options.render !== false) renderAll({ keepPage: true });
+  return { matched, missed, added, skippedByTeacher };
 }
 
 function applyScoresFromTextarea() {
   const rows = parseTsv($("scoreTsv")?.value || "").filter((row) => row.some((cell) => cell.trim()));
   if (rows.length === 0) return alert("붙여넣은 성적 데이터가 없습니다.");
   const result = applyScoreRows(rows);
-  showToast(`성적 반영 완료: 매칭 ${result.matched}명, 미매칭 ${result.missed}명`);
+  showToast(`성적 반영 완료: 반영 ${result.matched}명, 신규 ${result.added}명, 제외 ${result.skippedByTeacher}명`);
 }
 
 function downloadScoreTemplate() {
@@ -944,7 +995,18 @@ function downloadScoreTemplate() {
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
   XLSX.utils.book_append_sheet(wb, ws, "성적입력예시");
-  XLSX.writeFile(wb, `${makeProjectId(project) || "consultation"}_score_template.xlsx`);
+  XLSX.writeFile(wb, "sample.xlsx");
+}
+
+function createScoreImportRecord(rows, fileName = "") {
+  return {
+    importKey: makeScoreImportId(),
+    fileName,
+    rows,
+    importedAt: new Date().toISOString(),
+    importedBy: currentUser?.email || "",
+    rowCount: rows.length
+  };
 }
 
 async function importScoresFromFile(event) {
@@ -952,9 +1014,14 @@ async function importScoresFromFile(event) {
   event.target.value = "";
   if (!file) return;
   try {
-    const rows = await readRowsFromFile(file);
-    const result = applyScoreRows(rows.filter((row) => row.some((cell) => String(cell || "").trim())));
-    showToast(`엑셀 반영 완료: 매칭 ${result.matched}명, 미매칭 ${result.missed}명`);
+    const rows = (await readRowsFromFile(file)).filter((row) => row.some((cell) => String(cell || "").trim()));
+    project.scoreImport = createScoreImportRecord(rows, file.name);
+    project.sync.settingsDirty = true;
+    project.sync.hasUnsavedChanges = true;
+    saveProjectToLocalStorageNow();
+    if (firebaseReady && db && currentUser) await saveScoreImportToFirebase(project.scoreImport);
+    const result = applyScoreRows(rows);
+    showToast(`엑셀 반영 완료: 반영 ${result.matched}명, 신규 ${result.added}명, 제외 ${result.skippedByTeacher}명`);
   } catch (error) {
     console.error(error);
     alert(`파일을 읽는 중 문제가 생겼습니다.\n\n${error.message || error}`);
@@ -1499,6 +1566,7 @@ async function initFirebase() {
       currentUser = user || null;
       renderAuthState();
       renderFirebaseBadge();
+      if (currentUser) applyScoreImportForCurrentTeacher();
     });
   } catch (error) {
     console.error(error);
@@ -1567,6 +1635,83 @@ function removeInternalFields(student) {
   return clean;
 }
 
+function makeScoreImportId() {
+  const s = project.settings || {};
+  return [
+    makeSafeId(s.year || "year"),
+    makeSafeId(s.semester || "semester"),
+    makeSafeId(s.testType || "test")
+  ].join("__");
+}
+
+function getScoreImportRows(scoreImport = project.scoreImport) {
+  return Array.isArray(scoreImport?.rows) ? scoreImport.rows : [];
+}
+
+async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
+  const rows = getScoreImportRows(scoreImport);
+  if (!firebaseReady || !db || !currentUser || rows.length === 0) return;
+  const importId = scoreImport.importKey || makeScoreImportId();
+  const chunkSize = 300;
+  const chunkCount = Math.ceil(rows.length / chunkSize);
+  const importRef = fb.doc(db, "scoreImports", importId);
+  await fb.setDoc(importRef, {
+    importKey: importId,
+    fileName: scoreImport.fileName || "",
+    importedAt: scoreImport.importedAt || new Date().toISOString(),
+    importedBy: currentUser.email || currentUser.displayName || "anonymous",
+    rowCount: rows.length,
+    chunkCount,
+    year: project.settings.year,
+    semester: project.settings.semester,
+    testType: project.settings.testType,
+    updatedAt: fb.serverTimestamp()
+  }, { merge: true });
+  for (let i = 0; i < chunkCount; i += 1) {
+    const ref = fb.doc(db, "scoreImports", importId, "chunks", String(i).padStart(3, "0"));
+    await fb.setDoc(ref, { rows: rows.slice(i * chunkSize, (i + 1) * chunkSize) });
+  }
+}
+
+async function loadScoreImportFromFirebase() {
+  if (!firebaseReady || !db || !currentUser) return null;
+  const importId = makeScoreImportId();
+  const importRef = fb.doc(db, "scoreImports", importId);
+  const snap = await fb.getDoc(importRef);
+  if (!snap.exists()) return null;
+  const meta = snap.data();
+  const rows = [];
+  for (let i = 0; i < (meta.chunkCount || 0); i += 1) {
+    const chunkRef = fb.doc(db, "scoreImports", importId, "chunks", String(i).padStart(3, "0"));
+    const chunkSnap = await fb.getDoc(chunkRef);
+    if (chunkSnap.exists() && Array.isArray(chunkSnap.data().rows)) rows.push(...chunkSnap.data().rows);
+  }
+  if (rows.length === 0) return null;
+  return {
+    importKey: importId,
+    fileName: meta.fileName || "",
+    importedAt: meta.importedAt || "",
+    importedBy: meta.importedBy || "",
+    rowCount: rows.length,
+    rows
+  };
+}
+
+const applyScoreImportForCurrentTeacher = debounce(async () => {
+  if (!project.settings.teacherName) return;
+  let scoreImport = project.scoreImport;
+  if (getScoreImportRows(scoreImport).length === 0 && firebaseReady && db && currentUser) {
+    scoreImport = await loadScoreImportFromFirebase();
+    if (scoreImport) project.scoreImport = scoreImport;
+  }
+  const rows = getScoreImportRows(scoreImport);
+  if (rows.length === 0) return;
+  const result = applyScoreRows(rows, { teacherFilter: project.settings.teacherName });
+  if (result.matched || result.added) {
+    showToast(`담당자 기준 자동 업데이트: 반영 ${result.matched}명, 신규 ${result.added}명`);
+  }
+}, 250);
+
 async function saveProjectToFirebase() {
   saveProjectToLocalStorageNow();
   if (!firebaseReady || !db) {
@@ -1601,10 +1746,20 @@ async function saveProjectToFirebase() {
           schedule: project.settings.schedule,
           pageSize: project.settings.pageSize
         },
+        scoreImport: project.scoreImport ? {
+          importKey: project.scoreImport.importKey || makeScoreImportId(),
+          fileName: project.scoreImport.fileName || "",
+          importedAt: project.scoreImport.importedAt || "",
+          importedBy: project.scoreImport.importedBy || "",
+          rowCount: getScoreImportRows(project.scoreImport).length
+        } : null,
         studentCount: project.students.length,
         updatedAt: fb.serverTimestamp(),
         updatedBy: currentUser?.email || "anonymous"
       }, { merge: true });
+    }
+    if (project.scoreImport && getScoreImportRows(project.scoreImport).length > 0) {
+      await saveScoreImportToFirebase(project.scoreImport);
     }
     if (dirtyStudents.length > 0) {
       for (let i = 0; i < dirtyStudents.length; i += 400) {
@@ -1687,6 +1842,8 @@ async function loadProjectFromFirebase() {
       student._dirty = false;
     });
     project = loaded;
+    const scoreImport = await loadScoreImportFromFirebase();
+    if (scoreImport) project.scoreImport = scoreImport;
     state.selectedStudentId = project.students[0]?.id || "";
     saveProjectToLocalStorageNow();
     renderAll();
