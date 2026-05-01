@@ -1225,8 +1225,8 @@ async function importScoresFromFile(event) {
     if (!firebaseReady || !db || !currentUser) return alert("성적 파일 업로드와 서버 보관은 구글 로그인 후 사용할 수 있습니다.");
     const rows = (await readRowsFromFile(file)).filter((row) => row.some((cell) => String(cell || "").trim()));
     const inferredCriteria = inferScoreImportCriteria(rows, criteria);
-    const existingSnap = await fb.getDoc(fb.doc(db, "scoreImports", makeScoreImportId(inferredCriteria)));
-    if (existingSnap.exists() && !confirm("같은 연도/학기/시험의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) return;
+    const existing = await checkScoreImportExists(inferredCriteria);
+    if (existing && !confirm("같은 연도/학기/시험의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) return;
     project.settings.teacherName = inferredCriteria.teacherName;
     project.settings.year = inferredCriteria.year;
     project.settings.semester = inferredCriteria.semester;
@@ -1888,30 +1888,64 @@ function getScoreImportRows(scoreImport = project.scoreImport) {
   return Array.isArray(scoreImport?.rows) ? scoreImport.rows : [];
 }
 
+async function checkScoreImportExists(criteria) {
+  if (!firebaseReady || !db || !currentUser) return false;
+  const importId = makeScoreImportId(criteria);
+  const refs = [
+    fb.doc(db, "scoreImports", importId),
+    fb.doc(db, "consultationProjects", makeProjectId(project), "scoreImports", importId)
+  ];
+  for (const ref of refs) {
+    try {
+      const snap = await fb.getDoc(ref);
+      if (snap.exists()) return true;
+    } catch (error) {
+      console.warn("성적 데이터 중복 확인 건너뜀", error);
+    }
+  }
+  return false;
+}
+
 async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
   const rows = getScoreImportRows(scoreImport);
   if (!firebaseReady || !db || !currentUser || rows.length === 0) return;
   const importId = scoreImport.importKey || makeScoreImportId();
+  try {
+    await saveScoreImportAtRefs(scoreImport, [
+      fb.doc(db, "scoreImports", importId)
+    ]);
+  } catch (error) {
+    console.warn("상위 성적 보관소 저장 실패, 프로젝트 하위 경로로 재시도", error);
+    await saveScoreImportAtRefs(scoreImport, [
+      fb.doc(db, "consultationProjects", makeProjectId(project), "scoreImports", importId)
+    ]);
+  }
+}
+
+async function saveScoreImportAtRefs(scoreImport, importRefs) {
+  const rows = getScoreImportRows(scoreImport);
+  const importId = scoreImport.importKey || makeScoreImportId(scoreImport.criteria);
   const chunkSize = 300;
   const chunkCount = Math.ceil(rows.length / chunkSize);
-  const importRef = fb.doc(db, "scoreImports", importId);
-  await fb.setDoc(importRef, {
-    importKey: importId,
-    fileName: scoreImport.fileName || "",
-    criteria: scoreImport.criteria || {},
-    importedAt: scoreImport.importedAt || new Date().toISOString(),
-    importedBy: currentUser.email || currentUser.displayName || "anonymous",
-    rowCount: rows.length,
-    chunkCount,
-    year: scoreImport.criteria?.year || project.settings.year,
-    semester: scoreImport.criteria?.semester || project.settings.semester,
-    level: "",
-    testType: scoreImport.criteria?.testType || project.settings.testType,
-    updatedAt: fb.serverTimestamp()
-  }, { merge: true });
-  for (let i = 0; i < chunkCount; i += 1) {
-    const ref = fb.doc(db, "scoreImports", importId, "chunks", String(i).padStart(3, "0"));
-    await fb.setDoc(ref, { rows: rows.slice(i * chunkSize, (i + 1) * chunkSize) });
+  for (const importRef of importRefs) {
+    await fb.setDoc(importRef, {
+      importKey: importId,
+      fileName: scoreImport.fileName || "",
+      criteria: scoreImport.criteria || {},
+      importedAt: scoreImport.importedAt || new Date().toISOString(),
+      importedBy: currentUser.email || currentUser.displayName || "anonymous",
+      rowCount: rows.length,
+      chunkCount,
+      year: scoreImport.criteria?.year || project.settings.year,
+      semester: scoreImport.criteria?.semester || project.settings.semester,
+      level: "",
+      testType: scoreImport.criteria?.testType || project.settings.testType,
+      updatedAt: fb.serverTimestamp()
+    }, { merge: true });
+    for (let i = 0; i < chunkCount; i += 1) {
+      const ref = fb.doc(fb.collection(importRef, "chunks"), String(i).padStart(3, "0"));
+      await fb.setDoc(ref, { rows: rows.slice(i * chunkSize, (i + 1) * chunkSize) });
+    }
   }
   try {
     await saveStudentCodesToFirebase(rows, importId);
@@ -1945,13 +1979,29 @@ async function saveStudentCodesToFirebase(rows, importId = "") {
 async function loadScoreImportFromFirebase(criteria = {}) {
   if (!firebaseReady || !db || !currentUser) return null;
   const importId = makeScoreImportId(criteria);
-  const importRef = fb.doc(db, "scoreImports", importId);
-  const snap = await fb.getDoc(importRef);
-  if (!snap.exists()) return null;
+  const refs = [
+    fb.doc(db, "scoreImports", importId),
+    fb.doc(db, "consultationProjects", makeProjectId(project), "scoreImports", importId)
+  ];
+  let snap = null;
+  let importRef = null;
+  for (const ref of refs) {
+    try {
+      const candidate = await fb.getDoc(ref);
+      if (candidate.exists()) {
+        snap = candidate;
+        importRef = ref;
+        break;
+      }
+    } catch (error) {
+      console.warn("성적 데이터 불러오기 경로 건너뜀", error);
+    }
+  }
+  if (!snap || !importRef) return null;
   const meta = snap.data();
   const rows = [];
   for (let i = 0; i < (meta.chunkCount || 0); i += 1) {
-    const chunkRef = fb.doc(db, "scoreImports", importId, "chunks", String(i).padStart(3, "0"));
+    const chunkRef = fb.doc(fb.collection(importRef, "chunks"), String(i).padStart(3, "0"));
     const chunkSnap = await fb.getDoc(chunkRef);
     if (chunkSnap.exists() && Array.isArray(chunkSnap.data().rows)) rows.push(...chunkSnap.data().rows);
   }
