@@ -4,7 +4,7 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>상담기록 메이커 v. 0.78</title>
-  <link rel="icon" href="./favicon.svg?v=2" type="image/svg+xml" />
+  <link rel="icon" href="./favicon.svg?v=3" type="image/svg+xml" />
   <style>
     :root {
       --bg: #f4f6fb;
@@ -14,9 +14,9 @@
       --muted: #6b7280;
       --line: #e5e7eb;
       --line-strong: #d1d5db;
-      --brand: #2563eb;
-      --brand-dark: #1d4ed8;
-      --brand-soft: #eff6ff;
+      --brand: #c21872;
+      --brand-dark: #9f115c;
+      --brand-soft: #fdf2f8;
       --danger: #dc2626;
       --warning: #d97706;
       --ok: #059669;
@@ -42,20 +42,20 @@
       border: 0;
       border-radius: var(--radius-sm);
       padding: 9px 14px;
-      background: #eef2ff;
-      color: #1e3a8a;
+      background: #fdf2f8;
+      color: #831843;
       cursor: pointer;
       font-weight: 700;
       transition: 0.15s ease;
       white-space: nowrap;
     }
-    button:hover { background: #dbeafe; }
+    button:hover { background: #fce7f3; }
     button.primary { background: var(--brand); color: #fff; }
     button.primary:hover { background: var(--brand-dark); }
     button.danger { background: #fee2e2; color: #991b1b; }
     button.danger:hover { background: #fecaca; }
     button.ghost { background: transparent; color: #374151; border: 1px solid var(--line); }
-    button.ghost:hover { background: #f3f4f6; }
+    button.ghost:hover { background: var(--brand-soft); color: var(--brand-dark); }
     button.small { padding: 6px 10px; border-radius: 8px; font-size: 13px; }
     button:disabled { opacity: 0.5; cursor: not-allowed; }
 
@@ -71,7 +71,7 @@
     }
     input:focus, select:focus, textarea:focus {
       border-color: var(--brand);
-      box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.15);
+      box-shadow: 0 0 0 3px rgba(194, 24, 114, 0.15);
     }
     label {
       display: block;
@@ -453,6 +453,8 @@
       min-width: 0;
     }
     .split > section { min-width: 0; }
+    body.score-mode .split { grid-template-columns: 1fr; }
+    body.score-mode .preview-wrap { display: none; }
     .preview-wrap {
       position: sticky;
       top: 16px;
@@ -588,6 +590,15 @@
       min-width: 0;
       word-break: break-word;
     }
+    .student-link {
+      color: #111827;
+      font-weight: 800;
+      text-decoration: none;
+    }
+    .student-link:hover {
+      color: var(--brand);
+      text-decoration: underline;
+    }
     .progress-group {
       margin-top: 10px;
       padding: 7px 2px 2px;
@@ -609,11 +620,6 @@
     .progress-dot.complete {
       background: #10b981;
       box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
-    }
-
-    @container (max-width: 1180px) {
-      .split { grid-template-columns: 1fr; }
-      .preview-wrap { position: static; max-height: none; }
     }
 
     .mini-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -716,13 +722,7 @@
       .grid { grid-template-columns: 1fr; }
       .sidebar { position: static; height: auto; max-height: none; overflow: visible; }
       .progress-sidebar { position: static; height: auto; max-height: none; overflow: visible; }
-      .split { grid-template-columns: 1fr; }
-      .preview-wrap { position: static; max-height: none; }
       .tabs { top: 0; }
-    }
-    @media (max-width: 1800px) {
-      .split { grid-template-columns: 1fr; }
-      .preview-wrap { position: static; max-height: none; }
     }
     @media (max-width: 800px) {
       .app { padding: 8px 10px 18px; }
@@ -778,8 +778,6 @@
           <div class="more-wrap">
             <button id="moreBtn" class="ghost" type="button" aria-haspopup="menu" aria-expanded="false">더보기</button>
             <div id="moreMenu" class="more-menu" role="menu">
-              <button id="saveJsonBtn" type="button">JSON 저장</button>
-              <button id="loadJsonBtn" type="button">JSON 불러오기</button>
               <button id="exportTxtVerticalBtn" type="button">TXT 내보내기: 세로형</button>
               <button id="exportTxtTsvBtn" type="button">TXT 내보내기: 한 줄형</button>
               <button id="showLocalProjectsBtn" type="button">로컬 프로젝트 목록</button>
@@ -791,7 +789,6 @@
         </div>
       </div>
     </header>
-    <input id="jsonFileInput" type="file" accept="application/json,.json" hidden />
     <input id="scoreFileInput" type="file" accept=".xlsx,.xls,.csv,.tsv,.txt" hidden />
 
     <div class="grid">
@@ -1021,6 +1018,6 @@
   <div class="toast" id="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./consultation_app.js?v=20260501-10"></script>
+  <script type="module" src="./consultation_app.js?v=20260501-11"></script>
 </body>
 </html>

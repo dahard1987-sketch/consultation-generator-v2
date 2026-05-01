@@ -248,6 +248,7 @@ function normalizeStudent(raw, index = 0) {
     lowScoreCare: String(raw?.lowScoreCare || "").trim(),
     extraFieldValues: raw?.extraFieldValues || {},
     specialNote: String(raw?.specialNote || "").trim(),
+    memberCode: String(raw?.memberCode || raw?.studentCode || "").trim(),
     sourceTeacherName: String(raw?.sourceTeacherName || raw?.teacherName || "").trim(),
     scoreImportKey: String(raw?.scoreImportKey || "").trim(),
     manualComplete: Boolean(raw?.manualComplete),
@@ -319,12 +320,14 @@ function getStudentByNameAndClass(name, className = "") {
 function getOrCreateStudentFromScoreRow(name, className, meta = {}) {
   const existing = getStudentByNameAndClass(name, className);
   if (existing) {
+    if (meta.memberCode) existing.memberCode = meta.memberCode;
     if (meta.sourceTeacherName) existing.sourceTeacherName = meta.sourceTeacherName;
     if (meta.scoreImportKey) existing.scoreImportKey = meta.scoreImportKey;
     delete project.sync.deletedStudentIds[existing.id];
     return { student: existing, created: false };
   }
   const student = normalizeStudent({ name, className }, project.students.length);
+  student.memberCode = meta.memberCode || "";
   student.sourceTeacherName = meta.sourceTeacherName || "";
   student.scoreImportKey = meta.scoreImportKey || "";
   student._dirty = true;
@@ -342,6 +345,18 @@ function studentHasAnyInput(student) {
   if ([student.lowScoreCare, student.specialNote, student.scoreAnalysis?.good, student.scoreAnalysis?.problem, student.scoreAnalysis?.improvement].some(Boolean)) return true;
   if (Object.values(score).some(Boolean)) return true;
   return Object.values(student.extraFieldValues || {}).some(Boolean);
+}
+
+function getStudentCareUrl(student) {
+  const code = String(student?.memberCode || "").trim();
+  return code ? `https://sum.canb-english.com/student/care?memberCode=${encodeURIComponent(code)}` : "";
+}
+
+function renderStudentLink(student, fallbackText = "") {
+  const text = escapeHtml(fallbackText || student?.name || "");
+  const url = getStudentCareUrl(student);
+  if (!url) return `<span class="student-link">${text}</span>`;
+  return `<a class="student-link" href="${escapeHtml(url)}" target="_blank" rel="noopener noreferrer">${text}</a>`;
 }
 
 function getStudentProgressState(student) {
@@ -492,9 +507,6 @@ function bindEvents() {
   });
   $("copyCurrentBtn").addEventListener("click", copyCurrentConsultationText);
   $("copyAllBtn").addEventListener("click", copyAllConsultationTexts);
-  $("saveJsonBtn").addEventListener("click", saveProjectAsJSON);
-  $("loadJsonBtn").addEventListener("click", () => $("jsonFileInput").click());
-  $("jsonFileInput").addEventListener("change", loadProjectFromJSONFile);
   $("scoreFileInput").addEventListener("change", importScoresFromFile);
   $("saveServerBtn").addEventListener("click", saveProjectToFirebase);
   $("loadServerBtn").addEventListener("click", loadProjectFromFirebase);
@@ -535,16 +547,18 @@ function bindEvents() {
       saveProjectToFirebase();
     }
   });
-  window.addEventListener("beforeunload", (event) => {
-    if (project.sync?.hasUnsavedChanges) {
-      event.preventDefault();
-      event.returnValue = "";
-    }
+  window.addEventListener("beforeunload", () => {
+    saveProjectToLocalStorageNow();
   });
+}
+
+function updateActiveCriterionLayout() {
+  document.body.classList.toggle("score-mode", state.activeCriterion === "scores");
 }
 
 function renderAll({ keepPage = false } = {}) {
   if (!keepPage) state.currentPage = 0;
+  updateActiveCriterionLayout();
   renderSettingsInputs();
   renderProjectId();
   renderIncludeFields();
@@ -624,6 +638,7 @@ function renderTabs() {
   project.settings.extraFields.forEach((field) => tabs.push(`extra:${field.id}`));
   tabs.push("summary");
   if (!tabs.includes(state.activeCriterion)) state.activeCriterion = tabs[0] || "roster";
+  updateActiveCriterionLayout();
   const container = $("criterionTabs");
   container.innerHTML = "";
   tabs.forEach((key) => {
@@ -637,6 +652,8 @@ function renderTabs() {
       renderTabs();
       renderBulkTools();
       renderStudents();
+      renderPreviewStudentSelect();
+      renderPreview();
     });
     container.appendChild(btn);
   });
@@ -736,7 +753,7 @@ function renderBulkTools() {
           <div>
             <label for="scoreUploadLevel">레벨</label>
             <select id="scoreUploadLevel">
-              <option value="">선택</option>
+              <option value="">전체</option>
               ${LEVEL_OPTIONS.map((level) => `<option value="${level}" ${level === scoreCriteria.level ? "selected" : ""}>${level}</option>`).join("")}
             </select>
           </div>
@@ -792,7 +809,7 @@ function renderBulkScoreTable(students) {
     const score = getScore(student);
     const tr = document.createElement("tr");
     tr.innerHTML =
-      `<td>${escapeHtml(student.name)}</td><td>${escapeHtml(student.className)}</td>` +
+      `<td>${renderStudentLink(student)}</td><td>${escapeHtml(student.className)}</td>` +
       SCORE_COLUMNS.map(([key, label]) => `<td><input data-student-id="${escapeHtml(student.id)}" data-score-key="${key}" placeholder="${label}" value="${escapeHtml(score[key] || "")}" /></td>`).join("");
     tbody.appendChild(tr);
   });
@@ -866,6 +883,11 @@ function normalizeHeader(value) {
     "학생": "name",
     "student": "name",
     "name": "name",
+    "학생코드": "memberCode",
+    "학생id": "memberCode",
+    "studentcode": "memberCode",
+    "membercode": "memberCode",
+    "memberid": "memberCode",
     "반": "className",
     "수강반": "className",
     "class": "className",
@@ -962,7 +984,6 @@ function readScoreUploadCriteria() {
 function validateScoreUploadCriteria(criteria) {
   if (!criteria.teacherName) return "강사명을 먼저 입력해주세요.";
   if (!criteria.year) return "연도를 먼저 입력해주세요.";
-  if (!criteria.level) return "레벨을 먼저 선택해주세요.";
   if (!criteria.testType) return "시험 종류를 먼저 선택해주세요.";
   return "";
 }
@@ -977,7 +998,7 @@ function scoreRowsToObjects(rows) {
   const rawFirstRow = rows[0].map((cell) => String(cell || "").trim().toLowerCase());
   const isRawFormat = rawFirstRow.some((h) => h === "listening" || h === "overall");
   const header = rows[0].map(normalizeHeader);
-  const hasHeader = header.some((key) => ["name", "className", "lc", "rc", "vo", "gr", "total", "teacherName", "level"].includes(key));
+  const hasHeader = header.some((key) => ["name", "memberCode", "className", "lc", "rc", "vo", "gr", "total", "teacherName", "level"].includes(key));
   const dataRows = hasHeader ? rows.slice(1) : rows;
   const columns = hasHeader ? header : ["name", "className", "lc", "rc", "vo", "gr", "total"];
   return {
@@ -989,6 +1010,7 @@ function scoreRowsToObjects(rows) {
         if (key) obj[key] = row[index] ?? "";
       });
       obj.name = String(obj.name || row[0] || "").trim();
+      obj.memberCode = String(obj.memberCode || "").trim();
       obj.className = String(obj.className || row[1] || "").trim();
       obj.teacherName = String(obj.teacherName || "").trim();
       obj.level = normalizeLevel(obj.level || obj.className);
@@ -1046,6 +1068,7 @@ function applyScoreRows(rows, options = {}) {
     if (criteria.level && obj.level && normalizeLevel(obj.level).toLowerCase() !== normalizeLevel(criteria.level).toLowerCase()) return;
     if (!name) return;
     const { student, created } = getOrCreateStudentFromScoreRow(name, className, {
+      memberCode: obj.memberCode,
       sourceTeacherName: obj.teacherName,
       scoreImportKey: project.scoreImport?.importKey || makeScoreImportId(criteria)
     });
@@ -1105,7 +1128,7 @@ function downloadScoreTemplate() {
     rows.push([
       "",
       student.name,
-      "",
+      student.memberCode || "",
       level,
       student.className,
       testName,
@@ -1148,9 +1171,15 @@ async function prepareScoreFileUpload() {
   project.settings.testType = criteria.testType;
   state.pendingScoreUploadCriteria = criteria;
   if (firebaseReady && db && currentUser) {
-    const importRef = fb.doc(db, "scoreImports", makeScoreImportId(criteria));
-    const snap = await fb.getDoc(importRef);
-    if (snap.exists() && !confirm("같은 연도/레벨/시험 종류의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) {
+    const targets = criteria.level
+      ? [criteria]
+      : [{ ...criteria, level: "" }, ...LEVEL_OPTIONS.map((level) => ({ ...criteria, level }))];
+    const exists = await Promise.any(targets.map(async (target) => {
+      const snap = await fb.getDoc(fb.doc(db, "scoreImports", makeScoreImportId(target)));
+      if (snap.exists()) return true;
+      throw new Error("empty");
+    })).catch(() => false);
+    if (exists && !confirm("같은 연도/레벨/시험 종류의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) {
       state.pendingScoreUploadCriteria = null;
       return;
     }
@@ -1256,7 +1285,7 @@ function renderSummary(container, students) {
     const progress = getStudentProgressState(student);
     const progressText = progress === "complete" ? "완료" : progress === "in-progress" ? "입력 중" : "미입력";
     return `<tr>
-      <td><strong>${escapeHtml(student.name)}</strong><div class="student-meta">${escapeHtml(student.className)} · ${escapeHtml(student.classType)}</div></td>
+      <td>${renderStudentLink(student)}<div class="student-meta">${escapeHtml(student.className)} · ${escapeHtml(student.classType)}</div></td>
       <td>${student._dirty ? "저장 필요" : "저장됨"}</td>
       <td>${progressText}</td>
       <td>${escapeHtml(score.total || "")}</td>
@@ -1282,7 +1311,7 @@ function renderStudentCard(student) {
   card.innerHTML = `
     <div class="student-head">
       <div>
-        <div class="student-name">${escapeHtml(student.name)}</div>
+        <div class="student-name">${renderStudentLink(student)}</div>
         <div class="student-meta">${escapeHtml(student.className)} · ${escapeHtml(student.classType)}</div>
       </div>
       <div class="actions">${status}</div>
@@ -1798,7 +1827,7 @@ function makeScoreImportId(criteria = {}) {
   const s = { ...(project.settings || {}), ...(criteria || {}) };
   return [
     makeSafeId(s.year || "year"),
-    makeSafeId(s.level || "level"),
+    makeSafeId(s.level || "all"),
     makeSafeId(s.testType || "test")
   ].join("__");
 }
@@ -1830,6 +1859,29 @@ async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
   for (let i = 0; i < chunkCount; i += 1) {
     const ref = fb.doc(db, "scoreImports", importId, "chunks", String(i).padStart(3, "0"));
     await fb.setDoc(ref, { rows: rows.slice(i * chunkSize, (i + 1) * chunkSize) });
+  }
+  await saveStudentCodesToFirebase(rows, importId);
+}
+
+async function saveStudentCodesToFirebase(rows, importId = "") {
+  const parsed = scoreRowsToObjects(rows).objects.filter((row) => row.memberCode);
+  if (!firebaseReady || !db || !currentUser || parsed.length === 0) return;
+  for (let i = 0; i < parsed.length; i += 400) {
+    const batch = fb.writeBatch(db);
+    parsed.slice(i, i + 400).forEach((row) => {
+      const ref = fb.doc(db, "studentCodes", makeSafeId(row.memberCode));
+      batch.set(ref, {
+        memberCode: row.memberCode,
+        name: row.name || "",
+        className: row.className || "",
+        teacherName: row.teacherName || "",
+        level: row.level || "",
+        lastImportKey: importId,
+        updatedAt: fb.serverTimestamp(),
+        updatedBy: currentUser?.email || "anonymous"
+      }, { merge: true });
+    });
+    await batch.commit();
   }
 }
 
@@ -1864,6 +1916,8 @@ async function loadScoreImportsForCurrentSettings() {
     testType: project.settings.testType
   };
   const imports = [];
+  const allImport = await loadScoreImportFromFirebase({ ...base, level: "" });
+  if (allImport) return allImport;
   for (const level of LEVEL_OPTIONS) {
     const scoreImport = await loadScoreImportFromFirebase({ ...base, level });
     if (scoreImport) imports.push(scoreImport);
@@ -1898,7 +1952,7 @@ const applyScoreImportForCurrentTeacher = debounce(async () => {
 async function saveProjectToFirebase() {
   saveProjectToLocalStorageNow();
   if (!firebaseReady || !db) {
-    if (confirm("서버에 연결되어 있지 않습니다. 현재 프로젝트를 JSON 파일로 저장할까요?")) saveProjectAsJSON();
+    alert("서버에 연결되어 있지 않아 로컬에만 저장했습니다.");
     return;
   }
   if (!currentUser) {
@@ -2058,7 +2112,7 @@ function renderProgressSidebar() {
       const dotClass = progressState === "complete" ? "complete" : progressState === "in-progress" ? "in-progress" : "";
       return `<label class="progress-item">
         <input type="checkbox" data-progress-id="${escapeHtml(student.id)}" ${student.manualComplete ? "checked" : ""} />
-        <span class="progress-name">${escapeHtml(student.name)}</span>
+        <span class="progress-name">${renderStudentLink(student)}</span>
         <span class="progress-dot ${dotClass}"></span>
       </label>`;
     }).join("");
@@ -2072,6 +2126,9 @@ function renderProgressSidebar() {
       markStudentDirty(student);
       renderStudents();
     });
+  });
+  container.querySelectorAll("a.student-link").forEach((link) => {
+    link.addEventListener("click", (event) => event.stopPropagation());
   });
 }
 
