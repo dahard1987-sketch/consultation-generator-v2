@@ -1225,8 +1225,14 @@ async function importScoresFromFile(event) {
     rows = (await readRowsFromFile(file)).filter((row) => row.some((cell) => String(cell || "").trim()));
   } catch (error) {
     console.error(error);
-    alert(`파일을 읽는 중 문제가 생겼습니다.\n\n${error.message || error}`);
-    return;
+    const pastedRows = parseTsv($("scoreTsv")?.value || "").filter((row) => row.some((cell) => String(cell || "").trim()));
+    if (pastedRows.length > 1) {
+      rows = pastedRows;
+      showToast("파일 읽기 실패: 붙여넣기 영역 데이터로 반영합니다.");
+    } else {
+      alert(`브라우저가 선택한 엑셀 파일을 읽지 못했습니다.\n\n파일이 엑셀에서 열려 있다면 닫은 뒤 다시 업로드하거나, 엑셀 내용을 복사해서 붙여넣기 반영을 눌러주세요.\n\n${error.message || error}`);
+      return;
+    }
   }
   try {
     const inferredCriteria = inferScoreImportCriteria(rows, criteria);
@@ -1270,13 +1276,27 @@ async function readRowsFromFile(file) {
   const ext = file.name.split(".").pop()?.toLowerCase();
   if (["xlsx", "xls", "csv"].includes(ext)) {
     if (!window.XLSX) throw new Error("엑셀 라이브러리를 불러오지 못했습니다.");
-    const buffer = await file.arrayBuffer();
+    const buffer = await readFileAsArrayBuffer(file);
     const workbook = XLSX.read(buffer, { type: "array" });
     const sheet = workbook.Sheets[workbook.SheetNames[0]];
     return XLSX.utils.sheet_to_json(sheet, { header: 1, defval: "" }).map((row) => row.map((cell) => String(cell ?? "").trim()));
   }
   const text = await file.text();
   return parseTsv(text);
+}
+
+async function readFileAsArrayBuffer(file) {
+  try {
+    return await file.arrayBuffer();
+  } catch (error) {
+    console.warn("file.arrayBuffer 실패, FileReader로 재시도", error);
+    return await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error || error);
+      reader.readAsArrayBuffer(file);
+    });
+  }
 }
 
 function getFilteredStudents() {
