@@ -1207,7 +1207,6 @@ async function prepareScoreFileUpload() {
   const criteria = readScoreUploadCriteria();
   const error = validateScoreUploadCriteria(criteria);
   if (error) return alert(error);
-  if (!firebaseReady || !db || !currentUser) return alert("성적 파일 업로드와 서버 보관은 구글 로그인 후 사용할 수 있습니다.");
   project.settings.teacherName = criteria.teacherName;
   state.pendingScoreUploadCriteria = criteria;
   $("scoreFileInput").click();
@@ -1217,16 +1216,20 @@ async function importScoresFromFile(event) {
   const file = event.target.files?.[0];
   event.target.value = "";
   if (!file) return;
+  const criteria = state.pendingScoreUploadCriteria || readScoreUploadCriteria();
+  state.pendingScoreUploadCriteria = null;
+  const criteriaError = validateScoreUploadCriteria(criteria);
+  if (criteriaError) return alert(criteriaError);
+  let rows = [];
   try {
-    const criteria = state.pendingScoreUploadCriteria || readScoreUploadCriteria();
-    state.pendingScoreUploadCriteria = null;
-    const criteriaError = validateScoreUploadCriteria(criteria);
-    if (criteriaError) return alert(criteriaError);
-    if (!firebaseReady || !db || !currentUser) return alert("성적 파일 업로드와 서버 보관은 구글 로그인 후 사용할 수 있습니다.");
-    const rows = (await readRowsFromFile(file)).filter((row) => row.some((cell) => String(cell || "").trim()));
+    rows = (await readRowsFromFile(file)).filter((row) => row.some((cell) => String(cell || "").trim()));
+  } catch (error) {
+    console.error(error);
+    alert(`파일을 읽는 중 문제가 생겼습니다.\n\n${error.message || error}`);
+    return;
+  }
+  try {
     const inferredCriteria = inferScoreImportCriteria(rows, criteria);
-    const existing = await checkScoreImportExists(inferredCriteria);
-    if (existing && !confirm("같은 연도/학기/시험의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) return;
     project.settings.teacherName = inferredCriteria.teacherName;
     project.settings.year = inferredCriteria.year;
     project.settings.semester = inferredCriteria.semester;
@@ -1237,16 +1240,29 @@ async function importScoresFromFile(event) {
     project.sync.hasUnsavedChanges = true;
     saveProjectToLocalStorageNow();
     const result = applyScoreRows(rows, { teacherFilter: inferredCriteria.teacherName, criteria: inferredCriteria });
-    try {
-      await saveScoreImportToFirebase(project.scoreImport);
-    } catch (saveError) {
-      console.error(saveError);
-      alert(`성적은 작업 목록에 반영했지만 서버 보관에 실패했습니다.\n\n${saveError.message || saveError}`);
-    }
     showToast(`엑셀 반영 완료: 반영 ${result.matched}명, 신규 ${result.added}명, 제외 ${result.skippedByTeacher}명`);
+    persistScoreImportInBackground(project.scoreImport);
   } catch (error) {
     console.error(error);
-    alert(`파일을 읽는 중 문제가 생겼습니다.\n\n${error.message || error}`);
+    alert(`성적을 반영하는 중 문제가 생겼습니다.\n\n${error.message || error}`);
+  }
+}
+
+async function persistScoreImportInBackground(scoreImport) {
+  if (!scoreImport) return;
+  if (!firebaseReady || !db || !currentUser) {
+    console.warn("서버 보관 건너뜀: 로그인 또는 서버 연결 없음");
+    showToast("엑셀 반영 완료 · 서버 보관은 로그인 후 가능");
+    return;
+  }
+  try {
+    const existing = await checkScoreImportExists(scoreImport.criteria || {});
+    if (existing && !confirm("같은 연도/학기/시험의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) return;
+    await saveScoreImportToFirebase(scoreImport);
+    showToast("엑셀 반영 및 서버 보관 완료");
+  } catch (error) {
+    console.warn("서버 보관 실패", error);
+    showToast("엑셀 반영 완료 · 서버 보관 권한 확인 필요");
   }
 }
 
