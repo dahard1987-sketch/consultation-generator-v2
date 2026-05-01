@@ -2014,18 +2014,12 @@ function getScoreImportRows(scoreImport = project.scoreImport) {
 
 async function checkScoreImportExists(criteria) {
   if (!firebaseReady || !db || !currentUser) return false;
-  const importId = makeScoreImportId(criteria);
-  const refs = [
-    fb.doc(db, "scoreImports", importId),
-    fb.doc(db, "consultationProjects", makeProjectId(project), "scoreImports", importId)
-  ];
-  for (const ref of refs) {
-    try {
-      const snap = await fb.getDoc(ref);
-      if (snap.exists()) return true;
-    } catch (error) {
-      console.warn("성적 데이터 중복 확인 건너뜀", error);
-    }
+  try {
+    const ref = fb.doc(db, "consultationProjects", makeProjectId(project));
+    const snap = await fb.getDoc(ref);
+    if (snap.exists() && snap.data()?.scoreImportData?.rowCount > 0) return true;
+  } catch (error) {
+    console.warn("성적 데이터 중복 확인 건너뜀", error);
   }
   return false;
 }
@@ -2033,46 +2027,20 @@ async function checkScoreImportExists(criteria) {
 async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
   const rows = getScoreImportRows(scoreImport);
   if (!firebaseReady || !db || !currentUser || rows.length === 0) return;
-  const importId = scoreImport.importKey || makeScoreImportId();
-  try {
-    await saveScoreImportAtRefs(scoreImport, [
-      fb.doc(db, "scoreImports", importId)
-    ]);
-  } catch (error) {
-    console.warn("상위 성적 보관소 저장 실패, 프로젝트 하위 경로로 재시도", error);
-    await saveScoreImportAtRefs(scoreImport, [
-      fb.doc(db, "consultationProjects", makeProjectId(project), "scoreImports", importId)
-    ]);
-  }
-}
-
-async function saveScoreImportAtRefs(scoreImport, importRefs) {
-  const rows = getScoreImportRows(scoreImport);
-  const importId = scoreImport.importKey || makeScoreImportId(scoreImport.criteria);
-  const chunkSize = 300;
-  const chunkCount = Math.ceil(rows.length / chunkSize);
-  for (const importRef of importRefs) {
-    await fb.setDoc(importRef, {
-      importKey: importId,
+  const ref = fb.doc(db, "consultationProjects", makeProjectId(project));
+  await fb.setDoc(ref, {
+    scoreImportData: {
+      importKey: scoreImport.importKey || makeScoreImportId(),
       fileName: scoreImport.fileName || "",
       criteria: scoreImport.criteria || {},
       importedAt: scoreImport.importedAt || new Date().toISOString(),
       importedBy: currentUser.email || currentUser.displayName || "anonymous",
       rowCount: rows.length,
-      chunkCount,
-      year: scoreImport.criteria?.year || project.settings.year,
-      semester: scoreImport.criteria?.semester || project.settings.semester,
-      level: "",
-      testType: scoreImport.criteria?.testType || project.settings.testType,
-      updatedAt: fb.serverTimestamp()
-    }, { merge: true });
-    for (let i = 0; i < chunkCount; i += 1) {
-      const ref = fb.doc(fb.collection(importRef, "chunks"), String(i).padStart(3, "0"));
-      await fb.setDoc(ref, { rows: rows.slice(i * chunkSize, (i + 1) * chunkSize) });
+      rows
     }
-  }
+  }, { merge: true });
   try {
-    await saveStudentCodesToFirebase(rows, importId);
+    await saveStudentCodesToFirebase(rows, scoreImport.importKey || makeScoreImportId());
   } catch (error) {
     console.warn("학생코드 별도 저장 실패", error);
   }
@@ -2102,68 +2070,31 @@ async function saveStudentCodesToFirebase(rows, importId = "") {
 
 async function loadScoreImportFromFirebase(criteria = {}) {
   if (!firebaseReady || !db || !currentUser) return null;
-  const importId = makeScoreImportId(criteria);
-  const refs = [
-    fb.doc(db, "scoreImports", importId),
-    fb.doc(db, "consultationProjects", makeProjectId(project), "scoreImports", importId)
-  ];
-  let snap = null;
-  let importRef = null;
-  for (const ref of refs) {
-    try {
-      const candidate = await fb.getDoc(ref);
-      if (candidate.exists()) {
-        snap = candidate;
-        importRef = ref;
-        break;
+  try {
+    const ref = fb.doc(db, "consultationProjects", makeProjectId(project));
+    const snap = await fb.getDoc(ref);
+    if (snap.exists()) {
+      const data = snap.data()?.scoreImportData;
+      if (data && Array.isArray(data.rows) && data.rows.length > 0) {
+        return {
+          importKey: data.importKey || makeScoreImportId(criteria),
+          fileName: data.fileName || "",
+          criteria: data.criteria || criteria || {},
+          importedAt: data.importedAt || "",
+          importedBy: data.importedBy || "",
+          rowCount: data.rows.length,
+          rows: data.rows
+        };
       }
-    } catch (error) {
-      console.warn("성적 데이터 불러오기 경로 건너뜀", error);
     }
+  } catch (error) {
+    console.warn("메인 문서 성적 원본 읽기 실패", error);
   }
-  if (!snap || !importRef) return null;
-  const meta = snap.data();
-  const rows = [];
-  for (let i = 0; i < (meta.chunkCount || 0); i += 1) {
-    const chunkRef = fb.doc(fb.collection(importRef, "chunks"), String(i).padStart(3, "0"));
-    const chunkSnap = await fb.getDoc(chunkRef);
-    if (chunkSnap.exists() && Array.isArray(chunkSnap.data().rows)) rows.push(...chunkSnap.data().rows);
-  }
-  if (rows.length === 0) return null;
-  return {
-    importKey: importId,
-    fileName: meta.fileName || "",
-    criteria: meta.criteria || criteria || {},
-    importedAt: meta.importedAt || "",
-    importedBy: meta.importedBy || "",
-    rowCount: rows.length,
-    rows
-  };
+  return null;
 }
 
 async function loadScoreImportsForCurrentSettings() {
-  const base = {
-    year: project.settings.year,
-    semester: project.settings.semester,
-    testType: project.settings.testType
-  };
-  const imports = [];
-  const allImport = await loadScoreImportFromFirebase(base);
-  if (allImport) return allImport;
-  for (const level of LEVEL_OPTIONS) {
-    const scoreImport = await loadScoreImportFromFirebase({ ...base, level });
-    if (scoreImport) imports.push(scoreImport);
-  }
-  if (imports.length === 0) return null;
-  return {
-    importKey: makeScoreImportId(base),
-    fileName: imports.map((item) => item.fileName).filter(Boolean).join(", "),
-    criteria: base,
-    importedAt: imports[0].importedAt || "",
-    importedBy: imports[0].importedBy || "",
-    rowCount: imports.reduce((sum, item) => sum + getScoreImportRows(item).length, 0),
-    rows: imports.flatMap((item) => getScoreImportRows(item))
-  };
+  return loadScoreImportFromFirebase();
 }
 
 const applyScoreImportForCurrentTeacher = debounce(async () => {
