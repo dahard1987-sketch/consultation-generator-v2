@@ -64,8 +64,8 @@ const state = {
 
 function createDefaultSchedule() {
   return {
-    "2D": { firstReaction: "", testPlan: "", eopAlexAward: "", marketDay: "", summerStart: "", termEnd: "" },
-    "3D": { firstReaction: "", testPlan: "", eopAlexAward: "", marketDay: "", summerStart: "", termEnd: "" }
+    "2D": { nextTestName: "", nextTestDate: "", eopAlexAward: "", marketDay: "", summerStart: "", termEnd: "" },
+    "3D": { nextTestName: "", nextTestDate: "", eopAlexAward: "", marketDay: "", summerStart: "", termEnd: "" }
   };
 }
 
@@ -558,14 +558,14 @@ function renderIncludeFields() {
 
 function renderScheduleInputs() {
   const map = [
-    ["schedule3DFirstReaction", "3D", "firstReaction"],
-    ["schedule3DTestPlan", "3D", "testPlan"],
+    ["schedule3DNextTestName", "3D", "nextTestName"],
+    ["schedule3DNextTestDate", "3D", "nextTestDate"],
     ["schedule3DEopAlexAward", "3D", "eopAlexAward"],
     ["schedule3DMarketDay", "3D", "marketDay"],
     ["schedule3DSummerStart", "3D", "summerStart"],
     ["schedule3DTermEnd", "3D", "termEnd"],
-    ["schedule2DFirstReaction", "2D", "firstReaction"],
-    ["schedule2DTestPlan", "2D", "testPlan"],
+    ["schedule2DNextTestName", "2D", "nextTestName"],
+    ["schedule2DNextTestDate", "2D", "nextTestDate"],
     ["schedule2DEopAlexAward", "2D", "eopAlexAward"],
     ["schedule2DMarketDay", "2D", "marketDay"],
     ["schedule2DSummerStart", "2D", "summerStart"],
@@ -574,11 +574,13 @@ function renderScheduleInputs() {
   map.forEach(([id, type, key]) => {
     const el = $(id);
     el.value = project.settings.schedule?.[type]?.[key] || "";
-    el.oninput = () => {
+    const handler = () => {
       project.settings.schedule[type][key] = el.value.trim();
       markSettingsDirty({ rerender: false });
       renderPreview();
     };
+    el.oninput = handler;
+    el.onchange = handler;
   });
 }
 
@@ -793,6 +795,7 @@ function normalizeHeader(value) {
     "student": "name",
     "name": "name",
     "반": "className",
+    "수강반": "className",
     "class": "className",
     "classname": "className",
     "class_name": "className",
@@ -808,13 +811,56 @@ function normalizeHeader(value) {
     "gr": "gr",
     "grammar": "gr",
     "total": "total",
+    "overall": "total",
     "총점": "total"
   };
   return map[h] || h;
 }
 
+function detectLevelFromClass(className) {
+  const match = String(className || "").match(/^(Octa|Nona|Deca|Hepta|Penta|Demi|Alpha)/i);
+  return match ? match[1] : "";
+}
+
+function getTestQuestionCounts(testType, className) {
+  const test = String(testType || "").trim().toUpperCase();
+  if (test.startsWith("MT")) {
+    return { lc: 15, rc: 15, vo: 10, gr: 10 };
+  }
+  if (test === "TT") {
+    if (/Nona/i.test(className)) return { lc: 20, rc: 20, vo: 10, gr: 10 };
+    return { lc: 15, rc: 15, vo: 5, gr: 5 };
+  }
+  return null;
+}
+
+function convertRawScoresToWrong(scores, testType, className) {
+  const counts = getTestQuestionCounts(testType, className);
+  if (!counts) return scores;
+  const result = { ...scores };
+  if (scores.lc !== "") {
+    const v = parseFloat(scores.lc);
+    if (!isNaN(v)) result.lc = String(Math.round(v * counts.lc / 100) - counts.lc);
+  }
+  if (scores.rc !== "") {
+    const v = parseFloat(scores.rc);
+    if (!isNaN(v)) result.rc = String(Math.round(v * counts.rc / 100) - counts.rc);
+  }
+  if (scores.vo !== "") {
+    const v = parseFloat(scores.vo);
+    if (!isNaN(v)) result.vo = String(Math.round(v * counts.vo / 30) - counts.vo);
+  }
+  if (scores.gr !== "") {
+    const v = parseFloat(scores.gr);
+    if (!isNaN(v)) result.gr = String(Math.round(v * counts.gr / 30) - counts.gr);
+  }
+  return result;
+}
+
 function applyScoreRows(rows) {
   if (rows.length === 0) return { matched: 0, missed: 0 };
+  const rawFirstRow = rows[0].map((cell) => String(cell || "").trim().toLowerCase());
+  const isRawFormat = rawFirstRow.some((h) => h === "listening" || h === "overall");
   const header = rows[0].map(normalizeHeader);
   const hasHeader = header.some((key) => ["name", "className", "lc", "rc", "vo", "gr", "total"].includes(key));
   const dataRows = hasHeader ? rows.slice(1) : rows;
@@ -835,9 +881,23 @@ function applyScoreRows(rows) {
       return;
     }
     const score = getScore(student);
-    SCORE_COLUMNS.forEach(([key]) => {
-      if (obj[key] !== undefined) score[key] = String(obj[key] || "").trim();
-    });
+    if (isRawFormat) {
+      const rawScores = {
+        lc: String(obj.lc ?? "").trim(),
+        rc: String(obj.rc ?? "").trim(),
+        vo: String(obj.vo ?? "").trim(),
+        gr: String(obj.gr ?? "").trim(),
+        total: String(obj.total ?? "").trim()
+      };
+      const converted = convertRawScoresToWrong(rawScores, project.settings.testType, student.className);
+      SCORE_COLUMNS.forEach(([key]) => {
+        if (converted[key] !== "") score[key] = converted[key];
+      });
+    } else {
+      SCORE_COLUMNS.forEach(([key]) => {
+        if (obj[key] !== undefined) score[key] = String(obj[key] || "").trim();
+      });
+    }
     markStudentDirty(student);
     matched += 1;
   });
@@ -855,10 +915,31 @@ function applyScoresFromTextarea() {
 
 function downloadScoreTemplate() {
   if (!window.XLSX) return alert("엑셀 기능을 불러오지 못했습니다.");
-  const rows = [["이름", "반", "LC", "RC", "VO", "GR", "Total"]];
+  const rawYear = String(project.settings.year || "").trim();
+  const yearFull = rawYear.length === 2 ? `20${rawYear}` : rawYear;
+  const semesterLabel = SEMESTER_LABELS[project.settings.semester] || project.settings.semester || "";
+  const testType = project.settings.testType || "";
+  const rows = [["캠퍼스", "이름", "학생코드", "레벨", "수강반", "시험명", "담임", "응시일", "Overall", "Listening", "Reading", "Vocabulary", "Grammar", "소요시간(분)", "응시여부"]];
   project.students.forEach((student) => {
-    const score = getScore(student);
-    rows.push([student.name, student.className, score.lc || "", score.rc || "", score.vo || "", score.gr || "", score.total || ""]);
+    const level = detectLevelFromClass(student.className);
+    const testName = [`${yearFull} ${semesterLabel}`.trim(), level, testType].filter(Boolean).join(" ");
+    rows.push([
+      "",
+      student.name,
+      "",
+      level,
+      student.className,
+      testName,
+      project.settings.teacherName || "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      "",
+      ""
+    ]);
   });
   const wb = XLSX.utils.book_new();
   const ws = XLSX.utils.aoa_to_sheet(rows);
@@ -1132,9 +1213,9 @@ function getScheduleLines(student) {
   const schedule = project.settings.schedule?.[student.classType] || {};
   const consultationType = project.settings.consultationType;
   const lines = [];
-  if (["1차정기", "2차정기"].includes(consultationType)) {
-    if (schedule.firstReaction) lines.push(`첫 수업 후 반응: ${schedule.firstReaction}`);
-    if (schedule.testPlan) lines.push(`시험 일정: ${schedule.testPlan}`);
+  if (schedule.nextTestName || schedule.nextTestDate) {
+    const parts = [schedule.nextTestName, schedule.nextTestDate].filter(Boolean);
+    lines.push(`다음 시험: ${parts.join(" / ")}`);
   }
   if (["3차정기", "4차정기", "학기상담"].includes(consultationType)) {
     if (project.settings.nextSemester) lines.push(`다음 학기: ${semesterText(project.settings.year, project.settings.nextSemester)}`);

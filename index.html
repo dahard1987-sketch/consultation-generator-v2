@@ -854,8 +854,18 @@
             <div class="help" style="margin-bottom:10px;">상담문 하단에 넣을 학기 일정을 2D/3D별로 관리합니다. 비워둔 일정은 상담문에 포함되지 않습니다.</div>
             <div class="sub-head">3D 일정</div>
             <div class="form-grid">
-              <div><label for="schedule3DFirstReaction">다음 학기 첫 반응</label><input id="schedule3DFirstReaction" /></div>
-              <div><label for="schedule3DTestPlan">시험 계획</label><input id="schedule3DTestPlan" /></div>
+              <div>
+                <label for="schedule3DNextTestName">다음 시험 이름</label>
+                <select id="schedule3DNextTestName">
+                  <option value="">선택 안 함</option>
+                  <option value="MT1">MT1</option>
+                  <option value="MT2">MT2</option>
+                  <option value="TT">TT</option>
+                  <option value="Prelim">Prelim</option>
+                  <option value="ETC">ETC</option>
+                </select>
+              </div>
+              <div><label for="schedule3DNextTestDate">다음 시험 일정</label><input id="schedule3DNextTestDate" placeholder="예: 5/20" /></div>
               <div><label for="schedule3DEopAlexAward">EOP/ALEX</label><input id="schedule3DEopAlexAward" /></div>
               <div><label for="schedule3DMarketDay">Market Day</label><input id="schedule3DMarketDay" /></div>
               <div><label for="schedule3DSummerStart">다음 학기 시작</label><input id="schedule3DSummerStart" /></div>
@@ -863,8 +873,18 @@
             </div>
             <div class="sub-head">2D 일정</div>
             <div class="form-grid">
-              <div><label for="schedule2DFirstReaction">다음 학기 첫 반응</label><input id="schedule2DFirstReaction" /></div>
-              <div><label for="schedule2DTestPlan">시험 계획</label><input id="schedule2DTestPlan" /></div>
+              <div>
+                <label for="schedule2DNextTestName">다음 시험 이름</label>
+                <select id="schedule2DNextTestName">
+                  <option value="">선택 안 함</option>
+                  <option value="MT1">MT1</option>
+                  <option value="MT2">MT2</option>
+                  <option value="TT">TT</option>
+                  <option value="Prelim">Prelim</option>
+                  <option value="ETC">ETC</option>
+                </select>
+              </div>
+              <div><label for="schedule2DNextTestDate">다음 시험 일정</label><input id="schedule2DNextTestDate" placeholder="예: 5/20" /></div>
               <div><label for="schedule2DEopAlexAward">EOP/ALEX</label><input id="schedule2DEopAlexAward" /></div>
               <div><label for="schedule2DMarketDay">Market Day</label><input id="schedule2DMarketDay" /></div>
               <div><label for="schedule2DSummerStart">다음 학기 시작</label><input id="schedule2DSummerStart" /></div>
@@ -942,13 +962,13 @@
       </main>
 
       <aside class="progress-sidebar no-print">
-        <div class="side-section" open>
+        <details class="side-section" open>
           <summary>진행 현황</summary>
           <div class="side-body">
             <div id="progressSummary" class="help">학생을 입력하세요.</div>
             <div id="progressList" class="progress-list"></div>
           </div>
-        </div>
+        </details>
       </aside>
     </div>
   </div>
@@ -968,6 +988,6 @@
   <div class="toast" id="toast"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
-  <script type="module" src="./consultation_app.js?v=20260501-6"></script>
+  <script type="module" src="./consultation_app.js?v=20260501-7"></script>
 </body>
 </html>
