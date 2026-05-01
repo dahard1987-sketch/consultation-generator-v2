@@ -88,7 +88,7 @@
       padding: 14px 18px 24px;
     }
 
-    /* ====== TOP BAR (sticky) ====== */
+    /* ====== TOP BAR ====== */
     .topbar {
       display: flex;
       align-items: center;
@@ -100,8 +100,7 @@
       border-radius: var(--radius);
       box-shadow: var(--shadow);
       margin-bottom: 16px;
-      position: sticky;
-      top: 8px;
+      position: static;
       z-index: 20;
       flex-wrap: wrap;
     }
@@ -347,6 +346,7 @@
       box-shadow: var(--shadow);
       overflow: hidden;
       min-width: 0;
+      container-type: inline-size;
     }
     .tabs {
       display: flex;
@@ -454,10 +454,11 @@
     .split > section { min-width: 0; }
     .preview-wrap {
       position: sticky;
-      top: 130px;
+      top: 16px;
       max-height: calc(100vh - 150px);
       display: flex;
       flex-direction: column;
+      min-width: 0;
     }
     .preview-header {
       display: flex;
@@ -489,6 +490,8 @@
     .score-entry-card {
       display: grid;
       gap: 12px;
+      min-width: 0;
+      overflow: hidden;
     }
     .bulk-score-actions {
       display: flex;
@@ -498,7 +501,7 @@
     }
     .score-upload-config {
       display: grid;
-      grid-template-columns: repeat(4, minmax(120px, 1fr));
+      grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
       gap: 10px;
       align-items: end;
       padding: 12px;
@@ -508,6 +511,8 @@
     }
     .bulk-score-table-wrap {
       overflow: auto;
+      max-width: 100%;
+      min-width: 0;
       border: 1px solid var(--line);
       border-radius: var(--radius);
       background: #fff;
@@ -515,7 +520,7 @@
     .bulk-score-table {
       width: 100%;
       border-collapse: collapse;
-      min-width: 760px;
+      min-width: 640px;
     }
     .bulk-score-table th,
     .bulk-score-table td {
@@ -531,7 +536,7 @@
     }
     .bulk-score-table input,
     .bulk-score-table select {
-      min-width: 90px;
+      min-width: 76px;
       padding: 8px 9px;
     }
     .progress-sidebar {
@@ -593,6 +598,11 @@
     .progress-dot.complete {
       background: #10b981;
       box-shadow: 0 0 0 2px rgba(16, 185, 129, 0.15);
+    }
+
+    @container (max-width: 1180px) {
+      .split { grid-template-columns: 1fr; }
+      .preview-wrap { position: static; max-height: none; }
     }
 
     .mini-table { width: 100%; border-collapse: collapse; font-size: 13px; }
@@ -699,7 +709,7 @@
       .preview-wrap { position: static; max-height: none; }
       .tabs { top: 0; }
     }
-    @media (max-width: 1500px) {
+    @media (max-width: 1800px) {
       .split { grid-template-columns: 1fr; }
       .preview-wrap { position: static; max-height: none; }
     }
