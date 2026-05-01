@@ -737,31 +737,12 @@ function renderBulkTools() {
       <div class="student-card score-entry-card">
         <div>
           <div class="section-title">성적 입력</div>
-          <div class="help">담당자, 연도, 레벨, 시험 종류를 먼저 고른 뒤 업로드하면 해당 강사 학생만 작업 목록에 남깁니다.</div>
+          <div class="help">강사명만 고른 뒤 업로드하세요. 연도, 학기, 시험, 레벨, 소요시간은 엑셀 내용에서 읽고 전체 원본은 서버에 보관합니다.</div>
         </div>
         <div class="score-upload-config">
           <div>
             <label for="scoreUploadTeacher">강사명</label>
             <input id="scoreUploadTeacher" list="teacherList" placeholder="예: 최영진" value="${escapeHtml(scoreCriteria.teacherName || project.settings.teacherName || "")}" autocomplete="off" />
-          </div>
-          <div>
-            <label for="scoreUploadYear">연도</label>
-            <select id="scoreUploadYear">
-              ${YEAR_OPTIONS.map((year) => `<option value="${year}" ${year === normalizeYear(scoreCriteria.year || project.settings.year) ? "selected" : ""}>${year}</option>`).join("")}
-            </select>
-          </div>
-          <div>
-            <label for="scoreUploadLevel">레벨</label>
-            <select id="scoreUploadLevel">
-              <option value="">전체</option>
-              ${LEVEL_OPTIONS.map((level) => `<option value="${level}" ${level === scoreCriteria.level ? "selected" : ""}>${level}</option>`).join("")}
-            </select>
-          </div>
-          <div>
-            <label for="scoreUploadTestType">시험 종류</label>
-            <select id="scoreUploadTestType">
-              ${["MT1", "MT2", "TT", "Prelim", "ETC"].map((test) => `<option value="${test}" ${test === (scoreCriteria.testType || project.settings.testType || "MT2") ? "selected" : ""}>${test}</option>`).join("")}
-            </select>
           </div>
         </div>
         <div class="bulk-score-actions">
@@ -916,7 +897,13 @@ function normalizeHeader(value) {
     "level": "level",
     "시험명": "testName",
     "test": "testName",
-    "testname": "testName"
+    "testname": "testName",
+    "소요시간(분)": "durationMinutes",
+    "소요시간": "durationMinutes",
+    "duration": "durationMinutes",
+    "durationminutes": "durationMinutes",
+    "응시일": "testDate",
+    "응시여부": "attendance"
   };
   return map[h] || h;
 }
@@ -972,19 +959,35 @@ function normalizeLevel(value) {
   return level || String(value || "").trim();
 }
 
+function parseNumeric(value) {
+  const match = String(value ?? "").replace(/,/g, "").match(/-?\d+(?:\.\d+)?/);
+  return match ? Number(match[0]) : null;
+}
+
+function parseTestMetadata(testName = "") {
+  const text = String(testName || "");
+  const yearMatch = text.match(/20\d{2}|\b\d{2}\b/);
+  const semesterEntry = Object.entries(SEMESTER_LABELS).find(([, label]) => text.includes(label));
+  const testMatch = text.match(/\b(MT1|MT2|TT|Prelim)\b/i);
+  return {
+    year: yearMatch ? normalizeYear(yearMatch[0]) : "",
+    semester: semesterEntry?.[0] || "",
+    testType: testMatch ? (testMatch[1].toUpperCase() === "PRELIM" ? "Prelim" : testMatch[1].toUpperCase()) : ""
+  };
+}
+
 function readScoreUploadCriteria() {
   return {
     teacherName: $("scoreUploadTeacher")?.value.trim() || project.settings.teacherName || "",
-    year: normalizeYear($("scoreUploadYear")?.value || project.settings.year),
-    level: $("scoreUploadLevel")?.value.trim() || "",
-    testType: $("scoreUploadTestType")?.value.trim() || project.settings.testType || ""
+    year: project.settings.year,
+    semester: project.settings.semester,
+    level: "",
+    testType: project.settings.testType || ""
   };
 }
 
 function validateScoreUploadCriteria(criteria) {
   if (!criteria.teacherName) return "강사명을 먼저 입력해주세요.";
-  if (!criteria.year) return "연도를 먼저 입력해주세요.";
-  if (!criteria.testType) return "시험 종류를 먼저 선택해주세요.";
   return "";
 }
 
@@ -998,7 +1001,7 @@ function scoreRowsToObjects(rows) {
   const rawFirstRow = rows[0].map((cell) => String(cell || "").trim().toLowerCase());
   const isRawFormat = rawFirstRow.some((h) => h === "listening" || h === "overall");
   const header = rows[0].map(normalizeHeader);
-  const hasHeader = header.some((key) => ["name", "memberCode", "className", "lc", "rc", "vo", "gr", "total", "teacherName", "level"].includes(key));
+  const hasHeader = header.some((key) => ["name", "memberCode", "className", "lc", "rc", "vo", "gr", "total", "teacherName", "level", "testName", "durationMinutes"].includes(key));
   const dataRows = hasHeader ? rows.slice(1) : rows;
   const columns = hasHeader ? header : ["name", "className", "lc", "rc", "vo", "gr", "total"];
   return {
@@ -1014,9 +1017,41 @@ function scoreRowsToObjects(rows) {
       obj.className = String(obj.className || row[1] || "").trim();
       obj.teacherName = String(obj.teacherName || "").trim();
       obj.level = normalizeLevel(obj.level || obj.className);
+      obj.testName = String(obj.testName || "").trim();
+      obj.durationMinutes = parseNumeric(obj.durationMinutes);
       return obj;
     })
   };
+}
+
+function inferScoreImportCriteria(rows, base = {}) {
+  const parsed = scoreRowsToObjects(rows);
+  const teacher = normalizeTeacherName(base.teacherName);
+  const source = parsed.objects.find((row) => teacher && normalizeTeacherName(row.teacherName) === teacher && row.testName)
+    || parsed.objects.find((row) => row.testName)
+    || {};
+  const metadata = parseTestMetadata(source.testName);
+  return {
+    teacherName: base.teacherName || project.settings.teacherName || "",
+    year: metadata.year || normalizeYear(base.year || project.settings.year),
+    semester: metadata.semester || base.semester || project.settings.semester || "SP",
+    level: "",
+    testType: metadata.testType || base.testType || project.settings.testType || "MT2"
+  };
+}
+
+function getAverageDurationMinutes(objects, criteria = {}) {
+  const targetTest = String(criteria.testType || "").toUpperCase();
+  const durations = objects
+    .filter((row) => row.durationMinutes !== null)
+    .filter((row) => {
+      if (!targetTest) return true;
+      const rowTest = parseTestMetadata(row.testName).testType || criteria.testType;
+      return String(rowTest || "").toUpperCase() === targetTest;
+    })
+    .map((row) => row.durationMinutes);
+  if (durations.length === 0) return null;
+  return Math.round(durations.reduce((sum, value) => sum + value, 0) / durations.length);
 }
 
 function pruneImportedStudentsForTeacher(rows, teacherFilter, criteria = {}) {
@@ -1025,7 +1060,6 @@ function pruneImportedStudentsForTeacher(rows, teacherFilter, criteria = {}) {
   const keepKeys = new Set();
   parsed.objects.forEach((obj) => {
     if (!obj.name) return;
-    if (criteria.level && obj.level && normalizeLevel(obj.level).toLowerCase() !== normalizeLevel(criteria.level).toLowerCase()) return;
     const key = `${obj.className}__${obj.name}`;
     allUploadedKeys.add(key);
     if (!teacherFilter || normalizeTeacherName(obj.teacherName) === teacherFilter) keepKeys.add(key);
@@ -1052,6 +1086,7 @@ function applyScoreRows(rows, options = {}) {
   const shouldFilterByTeacher = Boolean(teacherFilter && scoreRowsHaveTeacherColumn(rows));
   const criteria = options.criteria || project.scoreImport?.criteria || {};
   const { objects, isRawFormat } = scoreRowsToObjects(rows);
+  const averageDurationMinutes = getAverageDurationMinutes(objects, criteria);
   const pruned = shouldFilterByTeacher ? pruneImportedStudentsForTeacher(rows, teacherFilter, criteria) : 0;
   let matched = 0;
   let missed = 0;
@@ -1065,7 +1100,6 @@ function applyScoreRows(rows, options = {}) {
       skippedByTeacher += 1;
       return;
     }
-    if (criteria.level && obj.level && normalizeLevel(obj.level).toLowerCase() !== normalizeLevel(criteria.level).toLowerCase()) return;
     if (!name) return;
     const { student, created } = getOrCreateStudentFromScoreRow(name, className, {
       memberCode: obj.memberCode,
@@ -1095,6 +1129,8 @@ function applyScoreRows(rows, options = {}) {
         if (obj[key] !== undefined) score[key] = String(obj[key] || "").trim();
       });
     }
+    if (obj.durationMinutes !== null) score.durationMinutes = String(obj.durationMinutes);
+    if (averageDurationMinutes !== null) score.averageDurationMinutes = String(averageDurationMinutes);
     markStudentDirty(student);
     matched += 1;
   });
@@ -1111,7 +1147,13 @@ function applyScoreRows(rows, options = {}) {
 function applyScoresFromTextarea() {
   const rows = parseTsv($("scoreTsv")?.value || "").filter((row) => row.some((cell) => cell.trim()));
   if (rows.length === 0) return alert("붙여넣은 성적 데이터가 없습니다.");
-  const result = applyScoreRows(rows);
+  const criteria = inferScoreImportCriteria(rows, readScoreUploadCriteria());
+  project.settings.teacherName = criteria.teacherName;
+  project.settings.year = criteria.year;
+  project.settings.semester = criteria.semester;
+  project.settings.nextSemester = getAutoNextSemester(criteria.semester);
+  project.settings.testType = criteria.testType;
+  const result = applyScoreRows(rows, { teacherFilter: criteria.teacherName, criteria });
   showToast(`성적 반영 완료: 반영 ${result.matched}명, 신규 ${result.added}명, 제외 ${result.skippedByTeacher}명`);
 }
 
@@ -1167,23 +1209,7 @@ async function prepareScoreFileUpload() {
   if (error) return alert(error);
   if (!firebaseReady || !db || !currentUser) return alert("성적 파일 업로드와 서버 보관은 구글 로그인 후 사용할 수 있습니다.");
   project.settings.teacherName = criteria.teacherName;
-  project.settings.year = criteria.year;
-  project.settings.testType = criteria.testType;
   state.pendingScoreUploadCriteria = criteria;
-  if (firebaseReady && db && currentUser) {
-    const targets = criteria.level
-      ? [criteria]
-      : [{ ...criteria, level: "" }, ...LEVEL_OPTIONS.map((level) => ({ ...criteria, level }))];
-    const exists = await Promise.any(targets.map(async (target) => {
-      const snap = await fb.getDoc(fb.doc(db, "scoreImports", makeScoreImportId(target)));
-      if (snap.exists()) return true;
-      throw new Error("empty");
-    })).catch(() => false);
-    if (exists && !confirm("같은 연도/레벨/시험 종류의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) {
-      state.pendingScoreUploadCriteria = null;
-      return;
-    }
-  }
   $("scoreFileInput").click();
 }
 
@@ -1198,12 +1224,25 @@ async function importScoresFromFile(event) {
     if (criteriaError) return alert(criteriaError);
     if (!firebaseReady || !db || !currentUser) return alert("성적 파일 업로드와 서버 보관은 구글 로그인 후 사용할 수 있습니다.");
     const rows = (await readRowsFromFile(file)).filter((row) => row.some((cell) => String(cell || "").trim()));
-    project.scoreImport = createScoreImportRecord(rows, file.name, criteria);
+    const inferredCriteria = inferScoreImportCriteria(rows, criteria);
+    const existingSnap = await fb.getDoc(fb.doc(db, "scoreImports", makeScoreImportId(inferredCriteria)));
+    if (existingSnap.exists() && !confirm("같은 연도/학기/시험의 성적 데이터가 이미 서버에 있습니다. 새 파일로 덮어쓸까요?")) return;
+    project.settings.teacherName = inferredCriteria.teacherName;
+    project.settings.year = inferredCriteria.year;
+    project.settings.semester = inferredCriteria.semester;
+    project.settings.nextSemester = getAutoNextSemester(inferredCriteria.semester);
+    project.settings.testType = inferredCriteria.testType;
+    project.scoreImport = createScoreImportRecord(rows, file.name, inferredCriteria);
     project.sync.settingsDirty = true;
     project.sync.hasUnsavedChanges = true;
     saveProjectToLocalStorageNow();
-    if (firebaseReady && db && currentUser) await saveScoreImportToFirebase(project.scoreImport);
-    const result = applyScoreRows(rows, { teacherFilter: criteria.teacherName, criteria });
+    const result = applyScoreRows(rows, { teacherFilter: inferredCriteria.teacherName, criteria: inferredCriteria });
+    try {
+      await saveScoreImportToFirebase(project.scoreImport);
+    } catch (saveError) {
+      console.error(saveError);
+      alert(`성적은 작업 목록에 반영했지만 서버 보관에 실패했습니다.\n\n${saveError.message || saveError}`);
+    }
     showToast(`엑셀 반영 완료: 반영 ${result.matched}명, 신규 ${result.added}명, 제외 ${result.skippedByTeacher}명`);
   } catch (error) {
     console.error(error);
@@ -1455,6 +1494,15 @@ function formatVocabTest(vocabTest) {
   return rating || (percent ? `${percent}%` : "");
 }
 
+function formatScoreDuration(score) {
+  const studentMinutes = parseNumeric(score?.durationMinutes);
+  const averageMinutes = parseNumeric(score?.averageDurationMinutes);
+  if (studentMinutes === null && averageMinutes === null) return "";
+  if (studentMinutes !== null && averageMinutes !== null) return `소요시간: 평균 ${averageMinutes}분 / 학생 ${studentMinutes}분`;
+  if (studentMinutes !== null) return `소요시간: 학생 ${studentMinutes}분`;
+  return `소요시간: 평균 ${averageMinutes}분`;
+}
+
 function splitMultiline(text) {
   return String(text ?? "").replace(/\r\n/g, "\n").split("\n");
 }
@@ -1499,7 +1547,11 @@ function buildConsultationText(student) {
   if (project.settings.includeFields.alex && formatRatingMemo(student.alex)) sections.push({ title: "Alex", lines: splitMultiline(formatRatingMemo(student.alex)) });
   if (project.settings.includeFields.vocabTest && formatVocabTest(student.vocabTest)) sections.push({ title: "지면 단어시험 결과", lines: [formatVocabTest(student.vocabTest)] });
   const scoreBits = SCORE_COLUMNS.filter(([key]) => score[key]).map(([key, label]) => `${label} ${score[key]}`);
-  if (scoreBits.length) sections.push({ title: `${project.settings.testType} 성적`, lines: [scoreBits.join(" / ")] });
+  const scoreLines = [];
+  if (scoreBits.length) scoreLines.push(scoreBits.join(" / "));
+  const durationLine = formatScoreDuration(score);
+  if (durationLine) scoreLines.push(durationLine);
+  if (scoreLines.length) sections.push({ title: `${project.settings.testType} 성적`, lines: scoreLines });
   if (project.settings.includeFields.score) {
     const analysisLines = [];
     if (student.scoreAnalysis.good) analysisLines.push(`잘한 점: ${student.scoreAnalysis.good}`);
@@ -1827,7 +1879,7 @@ function makeScoreImportId(criteria = {}) {
   const s = { ...(project.settings || {}), ...(criteria || {}) };
   return [
     makeSafeId(s.year || "year"),
-    makeSafeId(s.level || "all"),
+    makeSafeId(s.semester || "semester"),
     makeSafeId(s.testType || "test")
   ].join("__");
 }
@@ -1852,7 +1904,8 @@ async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
     rowCount: rows.length,
     chunkCount,
     year: scoreImport.criteria?.year || project.settings.year,
-    level: scoreImport.criteria?.level || "",
+    semester: scoreImport.criteria?.semester || project.settings.semester,
+    level: "",
     testType: scoreImport.criteria?.testType || project.settings.testType,
     updatedAt: fb.serverTimestamp()
   }, { merge: true });
@@ -1860,7 +1913,11 @@ async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
     const ref = fb.doc(db, "scoreImports", importId, "chunks", String(i).padStart(3, "0"));
     await fb.setDoc(ref, { rows: rows.slice(i * chunkSize, (i + 1) * chunkSize) });
   }
-  await saveStudentCodesToFirebase(rows, importId);
+  try {
+    await saveStudentCodesToFirebase(rows, importId);
+  } catch (error) {
+    console.warn("학생코드 별도 저장 실패", error);
+  }
 }
 
 async function saveStudentCodesToFirebase(rows, importId = "") {
@@ -1913,10 +1970,11 @@ async function loadScoreImportFromFirebase(criteria = {}) {
 async function loadScoreImportsForCurrentSettings() {
   const base = {
     year: project.settings.year,
+    semester: project.settings.semester,
     testType: project.settings.testType
   };
   const imports = [];
-  const allImport = await loadScoreImportFromFirebase({ ...base, level: "" });
+  const allImport = await loadScoreImportFromFirebase(base);
   if (allImport) return allImport;
   for (const level of LEVEL_OPTIONS) {
     const scoreImport = await loadScoreImportFromFirebase({ ...base, level });
@@ -1924,9 +1982,9 @@ async function loadScoreImportsForCurrentSettings() {
   }
   if (imports.length === 0) return null;
   return {
-    importKey: makeScoreImportId({ ...base, level: "all" }),
+    importKey: makeScoreImportId(base),
     fileName: imports.map((item) => item.fileName).filter(Boolean).join(", "),
-    criteria: { ...base, level: "" },
+    criteria: base,
     importedAt: imports[0].importedAt || "",
     importedBy: imports[0].importedBy || "",
     rowCount: imports.reduce((sum, item) => sum + getScoreImportRows(item).length, 0),
