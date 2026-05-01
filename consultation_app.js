@@ -224,9 +224,27 @@ function normalizeVocabTest(raw) {
   return { rating: String(raw.rating || "").trim(), percent: String(raw.percent || "").replace(/%/g, "").trim() };
 }
 
+function normalizeClassName(value) {
+  return String(value || "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .replace(/(^|\s)(2D|TTH|T\/TH|TUE\/THU|TUE\s*THU|화목)(?=\s|$)/gi, "$1화목")
+    .replace(/(^|\s)(3D|MWF|M\/W\/F|MON\/WED\/FRI|MON\s*WED\s*FRI|월수금)(?=\s|$)/gi, "$1월수금")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function classMatchKey(value) {
+  return normalizeClassName(value).toLowerCase();
+}
+
+function studentMatchKey(name, className) {
+  return `${classMatchKey(className)}__${String(name || "").trim().toLowerCase()}`;
+}
+
 function normalizeStudent(raw, index = 0) {
   const name = String(raw?.name || "").trim();
-  const className = String(raw?.className || raw?.class || "").trim();
+  const className = normalizeClassName(raw?.className || raw?.class || "");
   const classType = raw?.classType || detectClassType(className);
   const id = raw?.id || makeStudentId(className, name, index);
   return {
@@ -288,15 +306,15 @@ function normalizeProjectShape(raw) {
   merged.settings.nextSemester = getAutoNextSemester(merged.settings.semester);
   if (!["1차정기", "2차정기", "3차정기"].includes(merged.settings.consultationType)) merged.settings.consultationType = "3차정기";
   merged.version = 3;
-  merged.students = merged.students.map((student, index) => normalizeStudent(student, index));
+  merged.students = dedupeStudents(merged.students.map((student, index) => normalizeStudent(student, index)));
   merged.projectName = merged.projectName || makeAutoProjectNameFromSettings(merged.settings);
   return merged;
 }
 
 function detectClassType(className) {
   const text = String(className || "").toUpperCase();
-  if (/\b3D\b|MWF|MON|WED|FRI/.test(text)) return "3D";
-  if (/\b2D\b|TTH|TUE|THU/.test(text)) return "2D";
+  if (/월수금|\b3D\b|MWF|MON|WED|FRI/.test(text)) return "3D";
+  if (/화목|\b2D\b|TTH|TUE|THU/.test(text)) return "2D";
   return "2D";
 }
 
@@ -314,19 +332,23 @@ function getScore(student) {
 function getStudentByNameAndClass(name, className = "") {
   const candidates = project.students.filter((student) => student.name === name);
   if (!className) return candidates[0];
-  return candidates.find((student) => student.className === className);
+  const targetKey = classMatchKey(className);
+  return candidates.find((student) => classMatchKey(student.className) === targetKey);
 }
 
 function getOrCreateStudentFromScoreRow(name, className, meta = {}) {
-  const existing = getStudentByNameAndClass(name, className);
+  const normalizedClassName = normalizeClassName(className);
+  const existing = getStudentByNameAndClass(name, normalizedClassName);
   if (existing) {
+    existing.className = normalizedClassName || existing.className;
+    existing.classType = detectClassType(existing.className);
     if (meta.memberCode) existing.memberCode = meta.memberCode;
     if (meta.sourceTeacherName) existing.sourceTeacherName = meta.sourceTeacherName;
     if (meta.scoreImportKey) existing.scoreImportKey = meta.scoreImportKey;
     delete project.sync.deletedStudentIds[existing.id];
     return { student: existing, created: false };
   }
-  const student = normalizeStudent({ name, className }, project.students.length);
+  const student = normalizeStudent({ name, className: normalizedClassName }, project.students.length);
   student.memberCode = meta.memberCode || "";
   student.sourceTeacherName = meta.sourceTeacherName || "";
   student.scoreImportKey = meta.scoreImportKey || "";
@@ -335,6 +357,70 @@ function getOrCreateStudentFromScoreRow(name, className, meta = {}) {
   project.sync.dirtyStudentIds[student.id] = true;
   project.sync.settingsDirty = true;
   return { student, created: true };
+}
+
+function mergeRatingMemo(target, source) {
+  if (!target || !source) return;
+  if (!target.rating && source.rating) target.rating = source.rating;
+  if (!target.memo && source.memo) target.memo = source.memo;
+}
+
+function mergeStudentRecord(target, source) {
+  if (!target || !source || target === source) return target;
+  ["memberCode", "sourceTeacherName", "scoreImportKey", "attitude", "lowScoreCare", "specialNote"].forEach((key) => {
+    if (!target[key] && source[key]) target[key] = source[key];
+  });
+  mergeRatingMemo(target.bookHomework, source.bookHomework);
+  mergeRatingMemo(target.readi, source.readi);
+  mergeRatingMemo(target.alex, source.alex);
+  if (!target.vocabTest?.rating && source.vocabTest?.rating) target.vocabTest.rating = source.vocabTest.rating;
+  if (!target.vocabTest?.percent && source.vocabTest?.percent) target.vocabTest.percent = source.vocabTest.percent;
+  ["good", "problem", "improvement"].forEach((key) => {
+    if (!target.scoreAnalysis[key] && source.scoreAnalysis?.[key]) target.scoreAnalysis[key] = source.scoreAnalysis[key];
+  });
+  target.extraFieldValues = { ...(source.extraFieldValues || {}), ...(target.extraFieldValues || {}) };
+  Object.entries(source.scores || {}).forEach(([testType, sourceScore]) => {
+    if (!target.scores[testType]) target.scores[testType] = {};
+    Object.entries(sourceScore || {}).forEach(([key, value]) => {
+      if (value !== "" && value !== undefined && value !== null) target.scores[testType][key] = value;
+    });
+  });
+  target.manualComplete = Boolean(target.manualComplete || source.manualComplete);
+  target._dirty = Boolean(target._dirty || source._dirty);
+  target._lastSavedAt = target._lastSavedAt || source._lastSavedAt || "";
+  return target;
+}
+
+function dedupeStudents(students, { onDuplicate = null } = {}) {
+  const byKey = new Map();
+  const result = [];
+  students.forEach((student) => {
+    const normalized = normalizeStudent(student, result.length);
+    const key = studentMatchKey(normalized.name, normalized.className);
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, normalized);
+      result.push(normalized);
+      return;
+    }
+    mergeStudentRecord(existing, normalized);
+    if (onDuplicate) onDuplicate(existing, normalized);
+  });
+  return result;
+}
+
+function compactProjectStudents() {
+  let removed = 0;
+  project.students = dedupeStudents(project.students, {
+    onDuplicate: (kept, duplicate) => {
+      removed += 1;
+      if (duplicate.id && duplicate.id !== kept.id) project.sync.deletedStudentIds[duplicate.id] = true;
+      kept._dirty = true;
+      project.sync.dirtyStudentIds[kept.id] = true;
+    }
+  });
+  if (removed > 0) project.sync.hasUnsavedChanges = true;
+  return removed;
 }
 
 function studentHasAnyInput(student) {
@@ -669,6 +755,7 @@ function getTabLabel(key) {
 
 function renderClassFilter() {
   const classes = Array.from(new Set(project.students.map((student) => student.className).filter(Boolean))).sort((a, b) => a.localeCompare(b, "ko"));
+  if (state.classFilter && !classes.some((cls) => classMatchKey(cls) === classMatchKey(state.classFilter))) state.classFilter = "";
   $("classFilter").innerHTML = `<option value="">전체</option>` + classes.map((cls) => `<option value="${escapeHtml(cls)}">${escapeHtml(cls)}</option>`).join("");
   $("classFilter").value = state.classFilter;
 }
@@ -825,27 +912,27 @@ function applyRosterFromTextarea(append) {
     if (compact.length < 2) return;
     const joined = compact.join(" ").toLowerCase().replace(/\s+/g, "");
     if (/^(반|class|classname|학생|이름|name)/.test(joined)) return;
-    parsed.push({ className: compact[0], name: compact[1] });
+    parsed.push({ className: normalizeClassName(compact[0]), name: compact[1] });
   });
   if (parsed.length === 0) return alert("반과 이름 형식의 데이터를 찾지 못했습니다.");
-  const existing = new Map(project.students.map((student) => [`${student.className}__${student.name}`, student]));
+  const existing = new Map(project.students.map((student) => [studentMatchKey(student.name, student.className), student]));
   const nextStudents = parsed.map((row, index) => {
-    const matched = existing.get(`${row.className}__${row.name}`);
+    const matched = existing.get(studentMatchKey(row.name, row.className));
     if (matched) return normalizeStudent(matched, index);
     const student = normalizeStudent(row, index);
     student._dirty = true;
     return student;
   });
   if (append) {
-    const keys = new Set(project.students.map((student) => `${student.className}__${student.name}`));
+    const keys = new Set(project.students.map((student) => studentMatchKey(student.name, student.className)));
     nextStudents.forEach((student) => {
-      const key = `${student.className}__${student.name}`;
+      const key = studentMatchKey(student.name, student.className);
       if (!keys.has(key)) project.students.push(student);
     });
   } else {
     project.students = nextStudents;
   }
-  project.students = project.students.map((student, index) => normalizeStudent(student, index));
+  project.students = dedupeStudents(project.students.map((student, index) => normalizeStudent(student, index)));
   project.students.forEach((student) => {
     if (student._dirty) project.sync.dirtyStudentIds[student.id] = true;
   });
@@ -1014,7 +1101,7 @@ function scoreRowsToObjects(rows) {
       });
       obj.name = String(obj.name || row[0] || "").trim();
       obj.memberCode = String(obj.memberCode || "").trim();
-      obj.className = String(obj.className || row[1] || "").trim();
+      obj.className = normalizeClassName(obj.className || row[1] || "");
       obj.teacherName = String(obj.teacherName || "").trim();
       obj.level = normalizeLevel(obj.level || obj.className);
       obj.testName = String(obj.testName || "").trim();
@@ -1060,7 +1147,7 @@ function pruneImportedStudentsForTeacher(rows, teacherFilter, criteria = {}) {
   const keepKeys = new Set();
   parsed.objects.forEach((obj) => {
     if (!obj.name) return;
-    const key = `${obj.className}__${obj.name}`;
+    const key = studentMatchKey(obj.name, obj.className);
     allUploadedKeys.add(key);
     if (!teacherFilter || normalizeTeacherName(obj.teacherName) === teacherFilter) keepKeys.add(key);
   });
@@ -1068,7 +1155,7 @@ function pruneImportedStudentsForTeacher(rows, teacherFilter, criteria = {}) {
   const before = project.students.length;
   const kept = [];
   project.students.forEach((student) => {
-    const key = `${student.className}__${student.name}`;
+    const key = studentMatchKey(student.name, student.className);
     if (!allUploadedKeys.has(key) || keepKeys.has(key)) {
       kept.push(student);
     } else {
@@ -1136,6 +1223,7 @@ function applyScoreRows(rows, options = {}) {
   });
   if (matched || added || pruned) {
     project.students = project.students.map((student, index) => normalizeStudent(student, index));
+    compactProjectStudents();
     if (!state.selectedStudentId && project.students[0]) state.selectedStudentId = project.students[0].id;
     project.sync.hasUnsavedChanges = true;
     saveProjectToLocalStorageNow();
@@ -1302,7 +1390,7 @@ async function readFileAsArrayBuffer(file) {
 function getFilteredStudents() {
   const search = state.search.toLowerCase();
   return project.students.filter((student) => {
-    if (state.classFilter && student.className !== state.classFilter) return false;
+    if (state.classFilter && classMatchKey(student.className) !== classMatchKey(state.classFilter)) return false;
     if (search && !`${student.name} ${student.className}`.toLowerCase().includes(search)) return false;
     if (state.completionFilter === "dirty" && !student._dirty) return false;
     if (state.completionFilter === "complete" && !student.manualComplete) return false;
@@ -1400,7 +1488,7 @@ function renderCriterionInputs(student, criterion) {
   const wrap = document.createElement("div");
   if (criterion === "roster") {
     wrap.appendChild(makeInputRow("반", makeBoundInput(student.className, (value) => {
-      student.className = value;
+      student.className = normalizeClassName(value);
       student.classType = detectClassType(value);
       markStudentDirty(student, { rerender: true });
     })));
