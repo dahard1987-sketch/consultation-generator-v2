@@ -2045,8 +2045,7 @@ async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
   const metaRef = fb.doc(db, "consultationProjects", projectId);
   await fb.setDoc(metaRef, { scoreImportData: cleanMeta }, { merge: true });
   const rowsRef = fb.doc(db, "consultationProjects", projectId, "data", "scoreRows");
-  const cleanRows = JSON.parse(JSON.stringify(rows));
-  await fb.setDoc(rowsRef, { ...cleanMeta, rows: cleanRows });
+  await fb.setDoc(rowsRef, { ...cleanMeta, rowsJson: JSON.stringify(rows) });
   try {
     await saveStudentCodesToFirebase(rows, importKey);
   } catch (error) {
@@ -2082,16 +2081,17 @@ async function loadScoreImportFromFirebase(criteria = {}) {
   try {
     const rowsRef = fb.doc(db, "consultationProjects", projectId, "data", "scoreRows");
     const rowsSnap = await fb.getDoc(rowsRef);
-    if (rowsSnap.exists() && Array.isArray(rowsSnap.data()?.rows) && rowsSnap.data().rows.length > 0) {
+    if (rowsSnap.exists() && rowsSnap.data()?.rowsJson) {
       const data = rowsSnap.data();
-      return {
+      const rows = JSON.parse(data.rowsJson || "[]");
+      if (rows.length > 0) return {
         importKey: data.importKey || makeScoreImportId(criteria),
         fileName: data.fileName || "",
         criteria: data.criteria || criteria || {},
         importedAt: data.importedAt || "",
         importedBy: data.importedBy || "",
-        rowCount: data.rows.length,
-        rows: data.rows
+        rowCount: rows.length,
+        rows
       };
     }
   } catch (error) {
