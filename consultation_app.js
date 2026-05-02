@@ -2015,7 +2015,11 @@ function getScoreImportRows(scoreImport = project.scoreImport) {
 async function checkScoreImportExists(criteria) {
   if (!firebaseReady || !db || !currentUser) return false;
   try {
-    const ref = fb.doc(db, "consultationProjects", makeProjectId(project));
+    const projectId = makeProjectId(project);
+    const rowsRef = fb.doc(db, "consultationProjects", projectId, "data", "scoreRows");
+    const rowsSnap = await fb.getDoc(rowsRef);
+    if (rowsSnap.exists() && rowsSnap.data()?.rowCount > 0) return true;
+    const ref = fb.doc(db, "consultationProjects", projectId);
     const snap = await fb.getDoc(ref);
     if (snap.exists() && snap.data()?.scoreImportData?.rowCount > 0) return true;
   } catch (error) {
@@ -2027,20 +2031,22 @@ async function checkScoreImportExists(criteria) {
 async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
   const rows = getScoreImportRows(scoreImport);
   if (!firebaseReady || !db || !currentUser || rows.length === 0) return;
-  const ref = fb.doc(db, "consultationProjects", makeProjectId(project));
-  await fb.setDoc(ref, {
-    scoreImportData: {
-      importKey: scoreImport.importKey || makeScoreImportId(),
-      fileName: scoreImport.fileName || "",
-      criteria: scoreImport.criteria || {},
-      importedAt: scoreImport.importedAt || new Date().toISOString(),
-      importedBy: currentUser.email || currentUser.displayName || "anonymous",
-      rowCount: rows.length,
-      rows
-    }
-  }, { merge: true });
+  const projectId = makeProjectId(project);
+  const importKey = scoreImport.importKey || makeScoreImportId();
+  const meta = {
+    importKey,
+    fileName: scoreImport.fileName || "",
+    criteria: scoreImport.criteria || {},
+    importedAt: scoreImport.importedAt || new Date().toISOString(),
+    importedBy: currentUser.email || currentUser.displayName || "anonymous",
+    rowCount: rows.length
+  };
+  const metaRef = fb.doc(db, "consultationProjects", projectId);
+  await fb.setDoc(metaRef, { scoreImportData: meta }, { merge: true });
+  const rowsRef = fb.doc(db, "consultationProjects", projectId, "data", "scoreRows");
+  await fb.setDoc(rowsRef, { ...meta, rows });
   try {
-    await saveStudentCodesToFirebase(rows, scoreImport.importKey || makeScoreImportId());
+    await saveStudentCodesToFirebase(rows, importKey);
   } catch (error) {
     console.warn("학생코드 별도 저장 실패", error);
   }
@@ -2070,8 +2076,27 @@ async function saveStudentCodesToFirebase(rows, importId = "") {
 
 async function loadScoreImportFromFirebase(criteria = {}) {
   if (!firebaseReady || !db || !currentUser) return null;
+  const projectId = makeProjectId(project);
   try {
-    const ref = fb.doc(db, "consultationProjects", makeProjectId(project));
+    const rowsRef = fb.doc(db, "consultationProjects", projectId, "data", "scoreRows");
+    const rowsSnap = await fb.getDoc(rowsRef);
+    if (rowsSnap.exists() && Array.isArray(rowsSnap.data()?.rows) && rowsSnap.data().rows.length > 0) {
+      const data = rowsSnap.data();
+      return {
+        importKey: data.importKey || makeScoreImportId(criteria),
+        fileName: data.fileName || "",
+        criteria: data.criteria || criteria || {},
+        importedAt: data.importedAt || "",
+        importedBy: data.importedBy || "",
+        rowCount: data.rows.length,
+        rows: data.rows
+      };
+    }
+  } catch (error) {
+    console.warn("서브컬렉션 성적 원본 읽기 실패", error);
+  }
+  try {
+    const ref = fb.doc(db, "consultationProjects", projectId);
     const snap = await fb.getDoc(ref);
     if (snap.exists()) {
       const data = snap.data()?.scoreImportData;
@@ -2145,8 +2170,9 @@ async function saveProjectToFirebase() {
       await saveScoreImportToFirebase(project.scoreImport);
       result.scoreImport = true;
     } catch (error) {
-      console.warn("성적 원본 서버 보관 실패", error);
-      result.failed.push("성적 원본");
+      const errCode = error?.code || error?.message || String(error);
+      console.warn("성적 원본 서버 보관 실패", errCode, error);
+      result.failed.push(`성적 원본 (${errCode})`);
     }
   }
 
@@ -2173,8 +2199,8 @@ async function saveProjectToFirebase() {
   renderAll({ keepPage: true });
 
   if (result.failed.length > 0) {
-    setServerStatus(`부분 저장됨: 권한 확인 필요 (${result.failed.join(", ")})`);
-    showToast(`부분 저장됨: ${result.failed.join(", ")} 권한 확인 필요`);
+    setServerStatus(`부분 저장됨: ${result.failed.join(", ")}`);
+    showToast(`부분 저장됨: ${result.failed.join(", ")}`);
   } else {
     setServerStatus("서버 저장 완료");
     showToast(`서버 저장 완료: 저장 ${result.students}명, 삭제 ${result.deleted}명`);
