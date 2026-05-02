@@ -1914,7 +1914,7 @@ async function initFirebase() {
     ]);
     fb = { ...appMod, ...firestoreMod, ...authMod };
     firebaseApp = fb.initializeApp(firebaseConfig);
-    db = fb.getFirestore(firebaseApp);
+    db = fb.initializeFirestore(firebaseApp, { ignoreUndefinedProperties: true });
     try {
       auth = fb.initializeAuth(firebaseApp, {
         persistence: fb.browserLocalPersistence,
@@ -2041,11 +2041,12 @@ async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
     importedBy: currentUser.email || currentUser.displayName || "anonymous",
     rowCount: rows.length
   };
+  const cleanMeta = JSON.parse(JSON.stringify(meta));
   const metaRef = fb.doc(db, "consultationProjects", projectId);
-  await fb.setDoc(metaRef, { scoreImportData: meta }, { merge: true });
+  await fb.setDoc(metaRef, { scoreImportData: cleanMeta }, { merge: true });
   const rowsRef = fb.doc(db, "consultationProjects", projectId, "data", "scoreRows");
   const cleanRows = JSON.parse(JSON.stringify(rows));
-  await fb.setDoc(rowsRef, { ...meta, rows: cleanRows });
+  await fb.setDoc(rowsRef, { ...cleanMeta, rows: cleanRows });
   try {
     await saveStudentCodesToFirebase(rows, importKey);
   } catch (error) {
