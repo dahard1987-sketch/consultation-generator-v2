@@ -1938,7 +1938,10 @@ async function initFirebase() {
       currentUser = user || null;
       renderAuthState();
       renderFirebaseBadge();
-      if (currentUser) applyScoreImportForCurrentTeacher();
+      if (currentUser) {
+        applyScoreImportForCurrentTeacher();
+        autoLoadLastProjectFromServer();
+      }
     });
   } catch (error) {
     console.error(error);
@@ -2204,6 +2207,7 @@ async function saveProjectToFirebase() {
   project.sync.hasUnsavedChanges = project.sync.settingsDirty || Object.keys(project.sync.dirtyStudentIds || {}).length > 0;
   if (result.meta || result.students > 0 || result.deleted > 0 || result.scoreImport) {
     project.sync.lastServerSavedAt = new Date().toISOString();
+    localStorage.setItem("lastFirebaseProjectId", projectId);
   }
   saveProjectToLocalStorageNow();
   renderAll({ keepPage: true });
@@ -2276,6 +2280,49 @@ async function saveStudentsAsFields(projectId, dirtyStudents, deletedIds, result
     }
   }
   return savedIds;
+}
+
+async function autoLoadLastProjectFromServer() {
+  const lastId = localStorage.getItem("lastFirebaseProjectId");
+  if (!lastId || !firebaseReady || !db || !currentUser) return;
+  if (project.students.length > 0) return;
+  try {
+    const metaRef = fb.doc(db, "consultationProjects", lastId);
+    const snap = await fb.getDoc(metaRef);
+    if (!snap.exists()) return;
+    const meta = snap.data();
+    const students = (meta.students && typeof meta.students === "object" && !Array.isArray(meta.students))
+      ? Object.entries(meta.students).map(([id, data]) => ({ id, ...data })).filter(Boolean)
+      : [];
+    const loaded = normalizeProjectShape({
+      ...meta,
+      settings: {
+        ...(meta.settings || {}),
+        teacherName: meta.teacherName,
+        year: meta.year,
+        semester: meta.semester,
+        nextSemester: meta.nextSemester,
+        consultationType: meta.consultationType,
+        testType: meta.testType
+      },
+      students
+    });
+    loaded.sync.lastServerLoadedAt = new Date().toISOString();
+    loaded.sync.lastServerSavedAt = loaded.sync.lastServerSavedAt || meta.updatedAt || "";
+    loaded.sync.hasUnsavedChanges = false;
+    loaded.sync.dirtyStudentIds = {};
+    loaded.sync.deletedStudentIds = {};
+    loaded.sync.settingsDirty = false;
+    loaded.students.forEach((s) => { s._dirty = false; });
+    project = loaded;
+    const scoreImport = await loadScoreImportFromFirebase();
+    if (scoreImport) project.scoreImport = scoreImport;
+    saveProjectToLocalStorageNow();
+    renderAll();
+    showToast("서버에서 자동 불러오기 완료");
+  } catch (e) {
+    console.warn("자동 불러오기 실패", e);
+  }
 }
 
 async function loadProjectFromFirebase() {
