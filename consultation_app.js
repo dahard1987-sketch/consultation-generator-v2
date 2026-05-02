@@ -2044,7 +2044,8 @@ async function saveScoreImportToFirebase(scoreImport = project.scoreImport) {
   const metaRef = fb.doc(db, "consultationProjects", projectId);
   await fb.setDoc(metaRef, { scoreImportData: meta }, { merge: true });
   const rowsRef = fb.doc(db, "consultationProjects", projectId, "data", "scoreRows");
-  await fb.setDoc(rowsRef, { ...meta, rows });
+  const cleanRows = JSON.parse(JSON.stringify(rows));
+  await fb.setDoc(rowsRef, { ...meta, rows: cleanRows });
   try {
     await saveStudentCodesToFirebase(rows, importKey);
   } catch (error) {
