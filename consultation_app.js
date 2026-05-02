@@ -499,7 +499,9 @@ function renderSaveStatus() {
 const saveProjectToLocalStorage = debounce(() => {
   project.updatedAt = new Date().toISOString();
   project.sync.projectId = makeProjectId(project);
-  localStorage.setItem(getLocalStorageKey(), JSON.stringify(project));
+  const key = getLocalStorageKey();
+  localStorage.setItem(key, JSON.stringify(project));
+  localStorage.setItem("lastConsultationProjectKey", key);
   setLocalStatus("로컬 저장됨");
   renderProjectId();
 }, 60);
@@ -507,7 +509,9 @@ const saveProjectToLocalStorage = debounce(() => {
 function saveProjectToLocalStorageNow() {
   project.updatedAt = new Date().toISOString();
   project.sync.projectId = makeProjectId(project);
-  localStorage.setItem(getLocalStorageKey(), JSON.stringify(project));
+  const key = getLocalStorageKey();
+  localStorage.setItem(key, JSON.stringify(project));
+  localStorage.setItem("lastConsultationProjectKey", key);
   setLocalStatus("로컬 저장됨");
   renderProjectId();
 }
@@ -1822,7 +1826,11 @@ function loadProjectFromJSONFile(event) {
 }
 
 function loadProjectFromLocalStorage() {
-  const data = localStorage.getItem(getLocalStorageKey());
+  let data = localStorage.getItem(getLocalStorageKey());
+  if (!data) {
+    const lastKey = localStorage.getItem("lastConsultationProjectKey");
+    if (lastKey) data = localStorage.getItem(lastKey);
+  }
   if (!data) return false;
   const parsed = safeParseJson(data);
   if (!parsed) return false;
